@@ -1,0 +1,61 @@
+importlib user32,\
+	EnumChildWindows,\
+	GetWindowDC,\
+	GetWindowRect,\
+	DrawEdge,\
+	ReleaseDC,\
+	BeginPaint,\
+	EndPaint,\
+	GetClassNameA,\
+	FillRect,\
+	FrameRect,\
+	GetClientRect
+importlib gdi32,\
+	Rectangle,\
+	GetStockObject,\
+	SelectObject,\
+	CreateSolidBrush,\
+	DeleteObject,\
+	GetTextExtentPoint32A,\
+	TextOutA
+
+
+proc_noprologue
+
+proc MainForm_init uses pbx, lpForm, lpParams, lpEventData
+	@virtObj form:arg MainForm at pbx from @arg1
+
+	@call WND::getStockIcon(SIID.DRIVERAM)
+	@call form->setIcon(pax)
+	@call form->setCornerType(DWMWCP.DONOTROUND)
+
+	; theme settings
+	; @call SetHookSysColor(COLOR_WINDOWTEXT, 0x0)
+	mov [form.textColor], 0xFFFFFF
+	mov [form.backColor], MainForm.MAIN_COLOR
+	@call form->setCaptionColor(MainForm.MAIN_COLOR)
+	@call [EnumChildWindows](\
+		[form.hWnd], ChangeThemeChilds,\
+		<va_list L "DarkMode_Explorer", L "DarkMode_CFD",\
+		L "DarkMode_ItemsView", L "DarkMode_SearchBox",\ 
+		L "DarkMode_Immersive", NULL>\
+	)
+	@call [form.bgBrush] = [CreateSolidBrush](MainForm.MAIN_COLOR)
+	@call form.comboPorts->addItem("First item")
+	@call form.comboPorts->setSelected(0)
+	mov eax, esp
+	ret
+endp
+
+proc PushButton_ñlicked uses pbx, lpForm, lpParams, lpControl, lpEventData
+	@virtObj form:arg MainForm at pbx from @arg1
+	ret
+endp
+
+proc MainForm_close uses pbx, lpForm, lpParams, lpEventData
+	@virtObj form:arg MainForm at pbx from @arg1
+	@call [DeleteObject]([form.bgBrush])
+	ret
+endp
+
+proc_resprologue

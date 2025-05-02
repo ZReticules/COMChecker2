@@ -1,0 +1,26 @@
+proc_noprologue
+
+proc PortForm_init uses pbx, lpForm, lpParams, lpEventData
+	@virtObj form:arg PortForm at pbx from @arg1
+
+	@call WND::getStockIcon(SIID.DRIVERAM)
+	@call form->setIcon(pax)
+	@call form->setCornerType(DWMWCP.DONOTROUND)
+
+	; theme settings
+	; @call SetHookSysColor(COLOR_WINDOWTEXT, 0x0)
+	mov [form.textColor], 0xFFFFFF
+	mov [form.backColor], PortForm.MAIN_COLOR
+	@call form->setCaptionColor(PortForm.MAIN_COLOR)
+	@call [EnumChildWindows](\
+		[form.hWnd], ChangeThemeChilds,\
+		<va_list L "DarkMode_Explorer", L "DarkMode_CFD",\
+		L "DarkMode_ItemsView", L "DarkMode_SearchBox",\ 
+		L "DarkMode_Immersive", NULL>\
+	)
+	@call [form.bgBrush] = [CreateSolidBrush](PortForm.MAIN_COLOR)
+	mov eax, esp
+	ret
+endp
+
+proc_resprologue
