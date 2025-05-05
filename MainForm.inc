@@ -5,9 +5,15 @@ struct MainForm ColoredDialog
 	WM_CTLCOLORDLG  	event ColoredDialog_ctlColor
 	WM_CTLCOLOREDIT  	event ColoredDialog_ctlColor
 	WM_CTLCOLORSTATIC  	event ColoredDialog_ctlColor
+	WM_CTLCOLORLISTBOX 	event ColoredDialog_ctlColor
 	WM_CTLCOLORBTN  	event ColoredDialog_ctlColor
 	WM_CLOSE 			event MainForm_close
+	WM_DEVICECHANGE		event MainForm_deviceChange
 	; @on_scaling
+	
+	comInfo 		COMInfo
+	hDeviceNotify	dptr ?
+
 
 	const _font equ "Segoe UI Variable"
 	const _cx = 125
@@ -36,11 +42,13 @@ struct MainForm ColoredDialog
 					_style: WS_VISIBLE or BS_GROUPBOX,\
 					_style_ex: WS_EX_RIGHT,\
 					_initvals: ColoredSpecial_paint
-				$control COMBOBOX,\
+				$control SelChangeCombo,\
 					_name: comboPorts,\
 					_style: WS_VISIBLE or WS_TABSTOP or CBS_DROPDOWNLIST or CBS_SORT,\
-					_cy: 13
+					_cy: 13,\
+					<_initvals: NONE, MainForm_comboPortChanged>
 				$control PushButton,\
+					_name: btOpen,\
 					_text: "Открыть",\ 
 					_style: WS_VISIBLE or BS_DEFPUSHBUTTON or WS_TABSTOP,\
 					_initvals: PushButton_сlicked
@@ -58,32 +66,34 @@ struct MainForm ColoredDialog
 					_text: "Сведения",\
 					_initvals: ColoredSpecial_paint
 				$control STATIC,\
-					_cy: PortForm._pointsize,\
+					_cy: MainForm._pointsize,\
 					_text: "Описание"
 				$control EDIT,\
 					_name: edDesc,\
 					_style: WS_VISIBLE or WS_VSCROLL or ES_READONLY or ES_MULTILINE,\
 					_style_ex: WS_EX_STATICEDGE
 				$control STATIC,\
-					_name: stCreator,\
-					_cy: PortForm._pointsize,\
+					_cy: MainForm._pointsize,\
 					_text: "Производитель"
 				$control EDIT,\
-					_cy: PortForm._pointsize + 1,\
+					_name: edCreator,\
+					_cy: MainForm._pointsize + 1,\
 					_style: WS_VISIBLE or ES_READONLY,\
 					_style_ex: WS_EX_STATICEDGE
 				$control STATIC,\
-					_cy: PortForm._pointsize,\
+					_cy: MainForm._pointsize,\
 					_text: "Физ. имя"
 				$control EDIT,\
-					_cy: PortForm._pointsize + 1,\
+					_name: edPhysName,\
+					_cy: MainForm._pointsize + 1,\
 					_style: WS_VISIBLE or ES_READONLY,\
 					_style_ex: WS_EX_STATICEDGE
 				$control STATIC,\
-					_cy: PortForm._pointsize,\
+					_cy: MainForm._pointsize,\
 					_text: "Служба"
 				$control EDIT,\
-					_cy: PortForm._pointsize + 1,\
+					_name: edService,\
+					_cy: MainForm._pointsize + 1,\
 					_style: WS_VISIBLE or ES_READONLY,\
 					_style_ex: WS_EX_STATICEDGE
 			$endl

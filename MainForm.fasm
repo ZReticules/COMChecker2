@@ -10,6 +10,7 @@ importlib user32,\
 	FillRect,\
 	FrameRect,\
 	GetClientRect
+	
 importlib gdi32,\
 	Rectangle,\
 	GetStockObject,\
@@ -30,7 +31,6 @@ proc MainForm_init uses pbx, lpForm, lpParams, lpEventData
 	@call form->setCornerType(DWMWCP.DONOTROUND)
 
 	; theme settings
-	; @call SetHookSysColor(COLOR_WINDOWTEXT, 0x0)
 	mov [form.textColor], 0xFFFFFF
 	mov [form.backColor], MainForm.MAIN_COLOR
 	@call form->setCaptionColor(MainForm.MAIN_COLOR)
@@ -41,9 +41,100 @@ proc MainForm_init uses pbx, lpForm, lpParams, lpEventData
 		L "DarkMode_Immersive", NULL>\
 	)
 	@call [form.bgBrush] = [CreateSolidBrush](MainForm.MAIN_COLOR)
-	@call form.comboPorts->addItem("First item")
-	@call form.comboPorts->setSelected(0)
+	local comStr:rb 100
+	@call form.comInfo->make()
+	cmp [form.comInfo.countPorts], 0
+	je .noPorts
+		movzx esi, [form.comInfo.countPorts]
+		dec esi
+		.fillCombo:
+			@call form.comInfo->choseId(psi)
+			@call form.comInfo->getPortName(addr comStr, 100)
+			@call form.comboPorts->addItem(addr comStr)
+			@call form.comboPorts->setItemData(pax, psi)
+		dec esi
+		jns .fillCombo
+	.noPorts:
+	@call [form.hDeviceNotify] = COMInfo::registerNotify([form.hWnd], DEVICE_NOTIFY_WINDOW_HANDLE)
 	mov eax, esp
+	ret
+endp
+
+proc MainForm_comboPortChanged uses pbx, lpForm, lpParams, lpControl, lpEventData
+	@virtObj form:arg MainForm at pbx from @arg1
+
+	@call form.comboPorts->getTextLen()
+	switch pax
+		case 0
+			@call form.edDesc->setText(NULL)
+			@call form.edPhysName->setText(NULL)
+			@call form.edCreator->setText(NULL)
+			@call form.edService->setText(NULL)
+			jmp end_case
+		case_default
+			with infoBuf:String(0)
+				@call form.comboPorts->getSelected()
+				@call form.comboPorts->getItemData(pax)
+				@call form.comInfo->choseId(pax)
+
+				@call form.comInfo->getPortInfo(addr infoBuf, COMInfo.DESCRIPTION)
+				@call form.edDesc->setString(addr infoBuf)
+				
+				@call form.comInfo->getPortInfo(addr infoBuf, COMInfo.MFG)
+				@call form.edCreator->setString(addr infoBuf)
+				
+				@call form.comInfo->getPortInfo(addr infoBuf, COMInfo.PHYSIC_NAME)
+				@call form.edPhysName->setString(addr infoBuf)
+				
+				@call form.comInfo->getPortInfo(addr infoBuf, COMInfo.SERVICE)
+				@call form.edService->setString(addr infoBuf)
+			end_with
+	end_switch
+	ret
+endp
+
+proc MainForm_deviceChange uses pbx psi pdi, lpForm, lpParams, lpEventData
+	@virtObj form:arg MainForm at pbx from @arg1
+	locals
+		comInfo 	COMInfo
+		comStr 		db 100 dup (?)
+		comboText 	db 100 dup (?)
+		cbTextLen	dptr ?
+	endl
+
+	; load info about com-ports and fill combobox
+	@call form.comInfo->unmake()
+	@call form.comInfo->make()
+	@call form.comboPorts->setRedraw(0)
+	@call form.comboPorts->getText(addr comboText, 100)
+	mov [cbTextLen], pax
+	@call form.comboPorts->clear()
+	cmp [form.comInfo.countPorts], 0
+	je .noPorts
+		movzx psi, [form.comInfo.countPorts]
+		dec psi
+		.fillCombo:
+			@call form.comInfo->choseId(psi)
+			@call form.comInfo->getPortName(addr comStr, 100)
+			@call form.comboPorts->addItem(addr comStr)
+			@call form.comboPorts->setItemData(pax, psi)
+		dec psi	
+		jns .fillCombo
+		cmp [cbTextLen], 0
+		je .zeroText
+			@call form.comboPorts->findItem(-1, addr comboText)
+			xor ecx, ecx
+			cmp eax, CB_ERR
+				cmovne pcx, pax
+			@call form.comboPorts->setSelected(ecx)
+		.zeroText:
+	.noPorts:
+
+	; update displayed info
+	@call MainForm_comboPortChanged(addr form, NULL, NULL, NULL)
+
+	@call form.comboPorts->setRedraw(1)
+	@call form.comboPorts->invalidate()
 	ret
 endp
 
@@ -54,6 +145,8 @@ endp
 
 proc MainForm_close uses pbx, lpForm, lpParams, lpEventData
 	@virtObj form:arg MainForm at pbx from @arg1
+	@call COMInfo::unregisterNotify([form.hDeviceNotify])
+	@call form.comInfo->unmake()
 	@call [DeleteObject]([form.bgBrush])
 	ret
 endp

@@ -1,4 +1,4 @@
-define PROGRAM_TYPE Console
+define PROGRAM_TYPE GUI 6.0
 
 include "TOOLS\x64.inc"
 include "TOOLS\STDHEAD.inc"
@@ -8,32 +8,26 @@ include "TOOLS\cstdio.inc"
 include "TOOLS\Winuser.inc"
 include "TOOLS\DialogForm.inc"
 include "TOOLS\String.inc"
+include "TOOLS\COMPort\COMInfo.inc"
 
 entry main
 
 include "Controls.inc"
 include "ColoredDialog.inc"
-include "PortForm.inc"
+; include "PortForm.inc"
 include "MainForm.inc"
 
 importlib kernel32,\
 	ExitProcess
 
-proc_noprologue
+proc_noprologue 
 
-myForm dForm PortForm
-
-; proc proba, arg_list:POINTER
-; 	@larg pcx, @arg1
-; 	@call c [printf]("%llx", qword[pcx + pointer.size * 2])
-; 	ret
-; endp
+; myForm1 dForm PortForm
+myForm dForm MainForm
 
 proc main
-	; va_list@counter = va_list@counter + 8
-	; pcmpeqq xmm0, xmm0
-	; @call proba(<va_list 8, 9, xmm0>)
 	@call myForm->startNM(NULL)
+	; @call myForm1->startNM([myForm.hWnd])
 	.msgLoop:
 		@call myForm->dispatchMessages()
 	test eax, eax

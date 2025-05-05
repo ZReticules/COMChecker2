@@ -1,3 +1,10 @@
+importlib user32,\
+	EnumChildWindows,\
+	MapDialogRect
+importlib gdi32,\
+	CreateSolidBrush,\
+	DeleteObject
+
 proc_noprologue
 
 proc PortForm_init uses pbx, lpForm, lpParams, lpEventData
@@ -18,8 +25,23 @@ proc PortForm_init uses pbx, lpForm, lpParams, lpEventData
 		L "DarkMode_ItemsView", L "DarkMode_SearchBox",\ 
 		L "DarkMode_Immersive", NULL>\
 	)
+	@call [MapDialogRect]([form.hWnd], addr form.minMaxRect)
+	cmp [form.minMaxRect.right], 0
+	jg @f
+		mov [form.minMaxRect.right], 0x7FFFFFFF
+	@@:
+	cmp [form.minMaxRect.bottom], 0
+	jg @f
+		mov [form.minMaxRect.bottom], 0x7FFFFFFF
+	@@:
 	@call [form.bgBrush] = [CreateSolidBrush](PortForm.MAIN_COLOR)
 	mov eax, esp
+	ret
+endp
+
+proc PortForm_close uses pbx, lpForm, lpParams, lpEventData
+	@virtObj form:arg PortForm at pbx from @arg1
+	@call [DeleteObject]([form.bgBrush])
 	ret
 endp
 
