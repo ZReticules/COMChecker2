@@ -5,15 +5,44 @@ importlib uxtheme,\
 importlib user32,\
 	GetClassNameW
 
+; du "DarkMode_Explorer", 0
+; du "DarkMode_CFD", 0
+; du "DarkMode_ItemsView", 0
+; du "DarkMode_SearchBox", 0
+; du "DarkMode_Immersive", 0
+; du "DarkMode_Explorer", 0
+irp themeName, DarkMode_Explorer, DarkMode_CFD, DarkMode_ItemsView,\ 
+		DarkMode_SearchBox, DarkMode_Immersive{
+	ColoredDialog.#themeName @const du `themeName, 0
+	common
+	macro _\{
+		forward
+		dptr ColoredDialog.#themeName
+		common
+		dptr ColoredDialog.#DarkMode_Explorer
+		dptr NULL
+	\}
+	ColoredDialog.DarkThemes @const _
+	purge _
+}
+
 struct ColoredDialog DIALOGFORM
+	
+	WM_CTLCOLORDLG  	event ColoredDialog_ctlColor
+	WM_CTLCOLOREDIT  	event ColoredDialog_ctlColor
+	WM_CTLCOLORSTATIC  	event ColoredDialog_ctlColor
+	WM_CTLCOLORLISTBOX 	event ColoredDialog_ctlColor
+	WM_CTLCOLORBTN  	event ColoredDialog_ctlColor
+
 	bgBrush 	dptr ?
 	textColor 	dd ?
 	backColor	dd ?
+	hIcon  		dptr ?
 ends
 
 proc_noprologue
 
-proc ColoredSpecial_paint uses psi pbx, lpForm, lpParams, lpControl, lpEventData
+proc ColoredDialog_paintGroup uses psi pbx, lpForm, lpParams, lpControl, lpEventData
 	@virtObj form:arg ColoredDialog at pbx from @arg1
 	@virtObj control:arg CONTROL at psi from @arg3
 
@@ -80,6 +109,8 @@ proc ChangeThemeChilds uses psi, hWnd, vlThemeNames
 	test eax, eax
 	jz .continue
 		local className:rw 257, hThemeOld:POINTER, hThemeNew:POINTER
+		; @call [SetWindowTheme]([hWnd], L "Explorer", NULL)
+		; @call form.updCount->setTheme(L "DarkMode_Explorer")
 		@call [GetClassNameW]([hWnd], addr className, 257)
 		@call [hThemeOld] = [OpenThemeData]([hWnd], addr className)
 		mov psi, [vlThemeNames]
@@ -92,6 +123,7 @@ proc ChangeThemeChilds uses psi, hWnd, vlThemeNames
 				@call [CloseThemeData]([hThemeOld])
 				jmp .continue
 			.next:
+			; @call c [printf]("%S:%d:%d\n", addr className, [hThemeOld], pax)
 			@call [CloseThemeData](pax)
 			add psi, pointer.size
 		cmp pointer[psi], NULL

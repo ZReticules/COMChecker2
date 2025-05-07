@@ -1,6 +1,6 @@
 define PROGRAM_TYPE GUI 6.0
 
-include "TOOLS\x64.inc"
+include "TOOLS\x86.inc"
 include "TOOLS\STDHEAD.inc"
 include "encoding\win1251.inc"
 include "TOOLS\TOOLS.INC"
@@ -14,7 +14,7 @@ entry main
 
 include "Controls.inc"
 include "ColoredDialog.inc"
-; include "PortForm.inc"
+include "PortForm.inc"
 include "MainForm.inc"
 
 importlib kernel32,\
@@ -22,12 +22,13 @@ importlib kernel32,\
 
 proc_noprologue 
 
-; myForm1 dForm PortForm
 myForm dForm MainForm
 
+@bss_alloc _PortFormsMem rb sizeof.PortForm * 256
+
 proc main
+	mov [myForm.lpDevicesMem], _PortFormsMem
 	@call myForm->startNM(NULL)
-	; @call myForm1->startNM([myForm.hWnd])
 	.msgLoop:
 		@call myForm->dispatchMessages()
 	test eax, eax

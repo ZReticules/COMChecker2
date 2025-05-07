@@ -7,6 +7,5 @@ struct ColoredGroup BUTTON
 ends
 
 struct SelChangeCombo COMBOBOX
-	; CBN_DROPDOWN	event comboOpen
 	CBN_SELCHANGE event ?
 ends

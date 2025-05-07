@@ -10,7 +10,7 @@ importlib user32,\
 	FillRect,\
 	FrameRect,\
 	GetClientRect
-	
+
 importlib gdi32,\
 	Rectangle,\
 	GetStockObject,\
@@ -23,10 +23,10 @@ importlib gdi32,\
 
 proc_noprologue
 
-proc MainForm_init uses pbx, lpForm, lpParams, lpEventData
+proc MainForm_init uses pbx pdi psi, lpForm, lpParams, lpEventData
 	@virtObj form:arg MainForm at pbx from @arg1
 
-	@call WND::getStockIcon(SIID.DRIVERAM)
+	@call [form.hIcon] = WND::getStockIcon(SIID.DRIVERAM)
 	@call form->setIcon(pax)
 	@call form->setCornerType(DWMWCP.DONOTROUND)
 
@@ -36,9 +36,7 @@ proc MainForm_init uses pbx, lpForm, lpParams, lpEventData
 	@call form->setCaptionColor(MainForm.MAIN_COLOR)
 	@call [EnumChildWindows](\
 		[form.hWnd], ChangeThemeChilds,\
-		<va_list L "DarkMode_Explorer", L "DarkMode_CFD",\
-		L "DarkMode_ItemsView", L "DarkMode_SearchBox",\ 
-		L "DarkMode_Immersive", NULL>\
+		ColoredDialog.DarkThemes\
 	)
 	@call [form.bgBrush] = [CreateSolidBrush](MainForm.MAIN_COLOR)
 	local comStr:rb 100
@@ -55,6 +53,7 @@ proc MainForm_init uses pbx, lpForm, lpParams, lpEventData
 		dec esi
 		jns .fillCombo
 	.noPorts:
+	; @call form.comboPorts->addItem("COM256")
 	@call [form.hDeviceNotify] = COMInfo::registerNotify([form.hWnd], DEVICE_NOTIFY_WINDOW_HANDLE)
 	mov eax, esp
 	ret
@@ -138,13 +137,63 @@ proc MainForm_deviceChange uses pbx psi pdi, lpForm, lpParams, lpEventData
 	ret
 endp
 
-proc PushButton_сlicked uses pbx, lpForm, lpParams, lpControl, lpEventData
+proc MainForm.OpenButton_clicked uses pbx pdi psi, lpForm, lpParams, lpControl, lpEventData
+	.alreadyOpenErr @const db "Порт уже открыт!", 0
+	.outOfBoundsErr @const db "Порт должен быть от 1 до 256!", 0
+
 	@virtObj form:arg MainForm at pbx from @arg1
-	ret
+	local comName:rb 100
+	@call form.comboPorts->getText(addr comName, 100)
+	test eax, eax
+		jz .return
+	mov eax, 3
+	xor edi, edi
+	mov edx, "0"
+	@@:
+		sub edx, "0"
+		imul edi, edi, 10
+		add edi, edx
+		movzx edx, [comName + pax]
+		inc eax
+	test edx, edx
+	jnz @b
+	mov pax, .outOfBoundsErr
+	mov psi, pdi
+	dec pdi
+	cmp pdi, 256
+		jae .error
+	imul edi, edi, sizeof.PortForm
+	add pdi, [form.lpDevicesMem]
+
+	@virtObj portForm PortForm at pdi
+	mov pax, .alreadyOpenErr
+	cmp [portForm.hWnd], NULL
+		jne .error
+	@call CNV::fill(pdi, const dForm PortForm, sizeof.PortForm)
+	@call CNV::uintToStr(addr portForm.portIndex, psi, 10)
+	mov [portForm.lpParent], pbx
+	@call portForm->startNM(NULL)
+	.return: ret
+
+	.error:
+		@call WND::msgBox(pax)
+		ret
 endp
 
-proc MainForm_close uses pbx, lpForm, lpParams, lpEventData
+proc MainForm_close uses pbx psi pdi, lpForm, lpParams, lpEventData
 	@virtObj form:arg MainForm at pbx from @arg1
+
+	mov psi, [form.lpDevicesMem]
+	@virtObj portForm PortForm at psi + pdi - sizeof.PortForm
+	mov edi, sizeof.PortForm * 256
+	@@:
+		cmp [portForm.hWnd], NULL
+		je .inactive
+			@call portForm->close()
+		.inactive:
+	sub edi, sizeof.PortForm
+	jnz @b
+	@call WND::deleteStockIcon([form.hIcon])
 	@call COMInfo::unregisterNotify([form.hDeviceNotify])
 	@call form.comInfo->unmake()
 	@call [DeleteObject]([form.bgBrush])
