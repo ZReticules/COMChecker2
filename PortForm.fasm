@@ -315,6 +315,55 @@ proc PortForm.SetupButton_clicked uses pbx psi, lpForm, lpParams, lpControl, lpE
 	ret
 endp
 
+; proc PortForm.asciiToHex uses psi pdi, lpMem, lpSize
+; 	@sarg @arg1, @arg2
+; 	@larg psi, @arg1
+
+; 	local lpDest:POINTER
+; 	mov ecx, dword[psi]
+; 	@call pdi = CNV::alloc(addr pcx * 3 + 4)
+; 	mov [lpDest], pdi
+; 	mov ecx, dword[psi]
+	
+; 	lea pax, [pcx * 3]
+; 	mov dword[pdi], eax
+
+; 	mov pdx, [lpSize]
+; 	mov dword[pdx], eax
+	
+; 	add psi, 4
+; 	add pdi, 4
+; 	; mov pbx, pcx
+
+; 	.convert_loop:
+; 		xor eax, eax
+; 		lodsb
+; 		mov edx, eax
+
+
+; 		and eax, 0xF
+; 		shl eax, 8
+; 		cmp eax, 0x900
+; 		jbe @f
+; 			add eax, (0x4000 - 0x3900)
+; 		@@:
+
+; 		shr edx, 4
+; 		and edx, 0xF
+; 		cmp edx, 0x9
+; 		jbe @f
+; 			add edx, (0x40 - 0x39)
+; 		@@:
+; 		lea eax, [eax + edx + 0x200000 + 0x3030]
+; 		stosd
+; 		dec pdi
+; 	loop .convert_loop
+
+; 	@call CNV::free([lpMem])
+; 	mov pax, [lpDest]
+; 	ret
+; endp
+
 proc PortForm_COMIn uses pbx psi, lpForm, lpParams, lpEventData
 	@virtObj form:arg PortForm at pbx from @arg1
 	@virtObj _params:arg params at psi from @arg2
@@ -331,6 +380,8 @@ proc PortForm_COMIn uses pbx psi, lpForm, lpParams, lpEventData
 	; @call c [printf]("%d\n", [_params.lParam])
 	test [form.isPaused], 1
 	jnz .noAdd
+		; @call [_params.wParam] = PortForm.asciiToHex([_params.wParam], addr _params.lParam)
+		; @call PortForm.asciiToHex([_params.wParam], [_params.lParam])
 		@call form.editIn->setRedraw(0)
 		@call form.editIn->getSelected(addr startSel, addr endSel)
 		@call form.editIn->getTextLen()

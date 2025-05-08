@@ -27,8 +27,6 @@ myForm dForm MainForm
 
 @bss_alloc _PortFormsMem rb sizeof.PortForm * 256
 
-E GUID
-
 proc main
 	; %display_num sizeof.GUID, 10
 	mov [myForm.lpDevicesMem], _PortFormsMem
