@@ -1,14 +1,15 @@
 define PROGRAM_TYPE GUI 6.0
 
-include "TOOLS\x86.inc"
-include "TOOLS\STDHEAD.inc"
+include "FASM_OOP\x64.inc"
+include "FASM_OOP\STDHEAD.inc"
 include "encoding\win1251.inc"
-include "TOOLS\TOOLS.INC"
-include "TOOLS\cstdio.inc"
-include "TOOLS\Winuser.inc"
-include "TOOLS\DialogForm.inc"
-include "TOOLS\String.inc"
-include "TOOLS\COMPort\COMInfo.inc"
+include "FASM_OOP\TOOLS.INC"
+include "FASM_OOP\cstdio.inc"
+include "FASM_OOP\Winuser.inc"
+include "FASM_OOP\DialogForm.inc"
+include "FASM_OOP\String.inc"
+include "FASM_OOP\COMPort\COMInfo.inc"
+include "FASM_OOP\COMPort\COMIface.inc"
 
 entry main
 
@@ -26,7 +27,10 @@ myForm dForm MainForm
 
 @bss_alloc _PortFormsMem rb sizeof.PortForm * 256
 
+E GUID
+
 proc main
+	; %display_num sizeof.GUID, 10
 	mov [myForm.lpDevicesMem], _PortFormsMem
 	@call myForm->startNM(NULL)
 	.msgLoop:

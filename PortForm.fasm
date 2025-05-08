@@ -34,6 +34,7 @@ proc PortForm.switchThread c uses pbx psi, _this
 endp
 
 proc PortForm.ThreadProc, lpParam
+	@virtObj _params COMReadThreadParams at pbx from @arg1
 	locals
 		 comIface 	COMIface
 		 lastTime 	dptr ?
@@ -42,7 +43,6 @@ proc PortForm.ThreadProc, lpParam
 		 dcb 		DCB
 		 lpMem		dptr ?
 	endl
-	@virtObj _params COMReadThreadParams at pbx from @arg1
 
 	mov pax, [_params.hCOM]
 	mov [comIface.handle], pax
@@ -57,11 +57,10 @@ proc PortForm.ThreadProc, lpParam
 	@call [lastTime] = [GetTickCount]()
 	mov pax, [_params.hCOMEvent]
 	mov [o.hEvent], pax
-	mov pbp, [comIface.handle]
 	lea psi, [flags]
 	lea pdi, [o]
 	.read_loop:
-		@call [WaitCommEvent](pbp, psi, pdi)
+		@call comIface->waitEvent(psi, pdi)
 		@call [WaitForMultipleObjects](3, addr _params._events, 0, [_params.delay])
 		switch eax
 			case WAIT_OBJECT_0
@@ -108,7 +107,6 @@ proc PortForm.ThreadProc, lpParam
 				jae .overflow_buf
 					lea psi, [flags]
 					lea pdi, [o]
-					mov pbp, [comIface.handle]
 					@call [GetTickCount]()
 					sub eax, dword[lastTime]
 					cmp eax, [_params.delay]
@@ -236,7 +234,9 @@ proc PortForm_init uses pbx psi, lpForm, lpParams, lpEventData
 	
 	; stopped by default
 	@call form->switchThread()
-	mov [form.printPause], 1
+
+	@call [form.hDeviceNotify] = COMInfo::registerNotify([form.hWnd], DEVICE_NOTIFY_WINDOW_HANDLE)
+	mov [form.isPaused], 1
 	mov eax, esp
 	ret
 endp
@@ -244,9 +244,9 @@ endp
 proc PortForm.PauseButton_click uses pbx, lpForm, lpParams, lpControl, lpEventData
 	@virtObj form:arg PortForm at pbx from @arg1
 	.buttonOpenTexts @const dq "Пауза", "Пуск"
-	xor [form.printPause], 1
+	xor [form.isPaused], 1
 	@call form->switchThread()
-	mov eax, [form.printPause]
+	mov eax, [form.isPaused]
 	@call form.buttonPause->setText(addr .buttonOpenTexts + pax * 8)
 	ret
 endp
@@ -273,7 +273,7 @@ proc PortForm.SetupButton_clicked uses pbx psi, lpForm, lpParams, lpControl, lpE
 	@virtObj form:arg PortForm at pbx from @arg1
 	local dcb:DCB
 	
-	test [form.printPause], 1
+	test [form.isPaused], 1
 	jnz .no_pause_1
 		@call form->switchThread()
 	.no_pause_1:
@@ -308,8 +308,7 @@ proc PortForm.SetupButton_clicked uses pbx psi, lpForm, lpParams, lpControl, lpE
 	mov [form.threadParams.sizeBuf], eax
 	@call form.comIface->setParams(addr dcb)
 
-	; @call form.editIn->setText("")
-	test [form.printPause], 1
+	test [form.isPaused], 1
 	jnz .no_pause_2
 		@call form->switchThread()
 	.no_pause_2:
@@ -330,7 +329,7 @@ proc PortForm_COMIn uses pbx psi, lpForm, lpParams, lpEventData
 		ret
 	.noError:
 	; @call c [printf]("%d\n", [_params.lParam])
-	test [form.printPause], 1
+	test [form.isPaused], 1
 	jnz .noAdd
 		@call form.editIn->setRedraw(0)
 		@call form.editIn->getSelected(addr startSel, addr endSel)
@@ -360,6 +359,15 @@ proc PortForm_COMIn uses pbx psi, lpForm, lpParams, lpEventData
 	ret
 endp
 
+proc PortForm_deviceChange uses pbx, lpForm, lpParams, lpEventData
+	@virtObj form:arg PortForm at pbx from @arg1
+	@call form.comIface->getStat()
+	test pax, pax
+		jnz .return
+	@call form->close()
+	.return: ret
+endp
+
 proc PortForm_ctlColor, lpForm, lpParams, lpEventData
 	@virtObj form:arg PortForm at pcx from @arg1
 	@virtObj parent:arg ColoredDialog at pcx from [form.lpParent]
@@ -376,8 +384,9 @@ endp
 
 proc PortForm_close uses pbx, lpForm, lpParams, lpEventData
 	@virtObj form:arg PortForm at pbx from @arg1
+	@call COMInfo::unregisterNotify([form.hDeviceNotify])
 	@call form.strBuf->unmake()
-	test [form.printPause], 1
+	test [form.isPaused], 1
 	jz .no_paused
 		@call form->switchThread()
 	.no_paused:

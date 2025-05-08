@@ -5,8 +5,6 @@
 	; @at_start @call [PortForm.LpMemIndex] = [TlsAlloc]()
 	; @at_end @call [TlsFree]([PortForm.LpMemIndex])
 
-	include "COMIface.inc"
-
 	struct COMReadThreadParams
 		hWnd	dptr ?
 		hCOM	dptr ?
@@ -37,6 +35,7 @@
 		WM_CTLCOLORLISTBOX 	event PortForm_ctlColor
 		WM_CTLCOLORBTN  	event PortForm_ctlColor
 		PortForm.WM_COMM	event PortForm_COMIn
+		WM_DEVICECHANGE		event PortForm_deviceChange
 		WM_CLOSE 			event PortForm_close
 
 		@on_scaling
@@ -46,11 +45,12 @@
 		portName			db "COM"
 		portIndex 			rb 5
 		hThread 			dptr ?
-		printPause			dd 0
+		isPaused			dd ?
 		threadParams 		COMReadThreadParams
 		overlapped 			OVERLAPPED
 		comIface 			COMIface
 		strBuf  			String
+		hDeviceNotify		dptr ?
 
 		switchThread 		dm this
 
