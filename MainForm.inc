@@ -101,7 +101,7 @@
 		$endl
 	ends
 
-	ShblDialog_Mem_Ex MainForm, "COMCheker",  WS_VISIBLE or WS_SYSMENU or WS_MINIMIZEBOX or DS_CENTER or DS_SETFONT; or WS_SIZEBOX or WS_MAXIMIZEBOX
+	ShblDialog_Mem MainForm, "COMCheker",  WS_VISIBLE or WS_SYSMENU or WS_MINIMIZEBOX or DS_CENTER or DS_SETFONT; or WS_SIZEBOX or WS_MAXIMIZEBOX
 
 	include "MainForm.fasm"
 @endm

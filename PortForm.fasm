@@ -148,8 +148,8 @@ proc PortForm_init uses pbx psi, lpForm, lpParams, lpEventData
 	@call form->setIcon([parent.hIcon])
 	@call form->setCornerType(DWMWCP.DONOTROUND)
 	@call form->setText(addr form.portName)
-	@call form.tListBox->addItem("ASCII")
-	@call form.tListBox->addItem("HEX")
+	; @call form.tListBox->addItem("ASCII")
+	; @call form.tListBox->addItem("HEX")
 
 	; theme settings
 	@call form->setCaptionColor([parent.backColor])

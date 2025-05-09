@@ -164,10 +164,10 @@ $layout _cx: PortForm._cx,\
 					_text: "Пуск",\ 
 					_style: WS_VISIBLE or WS_TABSTOP,\
 					_initvals: PortForm.PauseButton_click
-				$control LISTBOX,\
-					_cx: 20,\
-					_name: tListBox,\ 
-					_style: WS_VISIBLE or WS_TABSTOP
+				; $control LISTBOX,\
+				; 	_cx: 20,\
+				; 	_name: tListBox,\ 
+				; 	_style: WS_VISIBLE or WS_TABSTOP
 				; $control BUTTON,\
 				; 	_style: WS_VISIBLE or WS_GROUP or WS_TABSTOP or BS_AUTORADIOBUTTON,\
 				; 	_text: "HEX"
