@@ -49,7 +49,7 @@ $layout _cx: PortForm._cx,\
 					$control EDIT,\
 						_name: editDelay,\
 						_cy: PortForm._pointsize,\
-						_style: WS_VISIBLE or ES_NUMBER,\
+						_style: WS_VISIBLE or WS_TABSTOP or ES_NUMBER,\
 						_style_ex: WS_EX_STATICEDGE,\
 						_text: "20"
 
@@ -79,7 +79,7 @@ $layout _cx: PortForm._cx,\
 					$control EDIT,\
 						_name: editBufSize,\
 						_cy: PortForm._pointsize,\
-						_style: WS_VISIBLE or ES_NUMBER,\
+						_style: WS_VISIBLE or WS_TABSTOP or ES_NUMBER,\
 						_style_ex: WS_EX_STATICEDGE,\
 						_text: "4096"
 
@@ -151,7 +151,9 @@ $layout _cx: PortForm._cx,\
 					_align: evenly,\
 					_cy: 25 %,\
 					_padding_top: 4,\
-					_y_sticker: EScaleMode.saveEnd
+					_y_sticker: EScaleMode.saveEnd,\
+					_x_sticker: EScaleMode.simple,\
+					_cx_sticker: EScaleMode.centerScale
 
 				$control PushButton,\
 					_name: buttonPause,\
@@ -162,13 +164,24 @@ $layout _cx: PortForm._cx,\
 					_text: "Пуск",\ 
 					_style: WS_VISIBLE or WS_TABSTOP,\
 					_initvals: PortForm.PauseButton_click
+				$control LISTBOX,\
+					_cx: 20,\
+					_name: tListBox,\ 
+					_style: WS_VISIBLE or WS_TABSTOP
+				; $control BUTTON,\
+				; 	_style: WS_VISIBLE or WS_GROUP or WS_TABSTOP or BS_AUTORADIOBUTTON,\
+				; 	_text: "HEX"
+				; $control BUTTON,\
+				; 	_name: radioASCII,\
+				; 	_style: WS_VISIBLE or WS_TABSTOP or BS_AUTORADIOBUTTON,\
+				; 	_text: "ASCII"
 				$control PushButton,\
 					_cx: 25 %,\
 					_padding_left: 5,\
 					_x_sticker: EScaleMode.saveSizeRight,\
 					_cx_sticker: EScaleMode.saveEnd,\
 					_text: "Очистить",\ 
-					_style: WS_VISIBLE or WS_TABSTOP,\
+					_style: WS_VISIBLE or WS_TABSTOP or WS_GROUP,\
 					_initvals: PortForm.ClearButton_click
 			$endl
 		$endl

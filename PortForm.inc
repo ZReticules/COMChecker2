@@ -57,7 +57,7 @@
 		include "PortForm_markup.inc"
 	ends
 
-	ShblDialog_Mem PortForm, "",  WS_VISIBLE or WS_SYSMENU or WS_MINIMIZEBOX or DS_CENTER or DS_SETFONT or WS_SIZEBOX or WS_MAXIMIZEBOX
+	ShblDialog_Mem_Ex PortForm, "",  WS_VISIBLE or WS_SYSMENU or WS_MINIMIZEBOX or DS_CENTER or DS_SETFONT or WS_SIZEBOX or WS_MAXIMIZEBOX
 
 	include "PortForm.fasm"
 @endm

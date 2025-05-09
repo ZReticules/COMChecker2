@@ -1,7 +1,9 @@
 importlib user32,\
 	EnumChildWindows,\
 	MapDialogRect,\
-	PostMessageA
+	PostMessageA,\
+	GetScrollRange,\
+	SetScrollPos
 importlib gdi32,\
 	CreateSolidBrush,\
 	DeleteObject
@@ -146,6 +148,8 @@ proc PortForm_init uses pbx psi, lpForm, lpParams, lpEventData
 	@call form->setIcon([parent.hIcon])
 	@call form->setCornerType(DWMWCP.DONOTROUND)
 	@call form->setText(addr form.portName)
+	@call form.tListBox->addItem("ASCII")
+	@call form.tListBox->addItem("HEX")
 
 	; theme settings
 	@call form->setCaptionColor([parent.backColor])
@@ -271,12 +275,12 @@ proc PortForm.SetupButton_clicked uses pbx psi, lpForm, lpParams, lpControl, lpE
 			1800, 2400, 4800, 7200, 9600, 14400, 19200, \
 			38400, 57600, 115200, 128000
 	@virtObj form:arg PortForm at pbx from @arg1
-	local dcb:DCB
+	local dcb:DCB, retAddr:POINTER
 	
+	mov [retAddr], .after_pause_1
 	test [form.isPaused], 1
-	jnz .no_pause_1
-		@call form->switchThread()
-	.no_pause_1:
+		jz .pause
+	.after_pause_1:
 
 	; setup COMIface
 	@call form.comIface->getParams(addr dcb)
@@ -292,27 +296,39 @@ proc PortForm.SetupButton_clicked uses pbx psi, lpForm, lpParams, lpControl, lpE
 	mov [dcb.StopBits], al
 	@call form.editDelay->getString(addr form.strBuf)
 	@call form.strBuf->parseInt(10)
+
+	.delayError @const db "Слишком низкая задержка! Не менее 10 мс.", 0
+	mov pdx, .delayError
 	cmp eax, 10
-	jae .check_delay
-		@call WND::msgBox("Слишком низкая задержка! Не менее 10 мс.")
-		ret
-	.check_delay:
+		jb .error
+	
 	mov [form.threadParams.delay], eax
 	@call form.editBufSize->getString(addr form.strBuf)
 	@call form.strBuf->parseInt(10)
+
+	.sizeError @const db "Недопустимый размер буфера! От 512 до 65 536 байт.", 0
+	mov pdx, .sizeError
 	cmp eax, 512
-	jae .check_size
-		@call WND::msgBox("Слишком маленький размер буфера! Не менее 512 байт.")
-		ret
-	.check_size:
+		jb .error
+	cmp eax, 65536
+		ja .error
+
 	mov [form.threadParams.sizeBuf], eax
 	@call form.comIface->setParams(addr dcb)
 
+	mov [retAddr], .after_pause_2
 	test [form.isPaused], 1
-	jnz .no_pause_2
-		@call form->switchThread()
-	.no_pause_2:
+		jz .pause
+	.after_pause_2:
 	ret
+
+	.pause:
+		@call form->switchThread()
+		jmp [retAddr]
+
+	.error:
+		@call WND::msgBox(pdx)
+		ret
 endp
 
 ; proc PortForm.asciiToHex uses psi pdi, lpMem, lpSize
@@ -405,6 +421,9 @@ proc PortForm_COMIn uses pbx psi, lpForm, lpParams, lpEventData
 		jl .breakBounds
 			@call form.editIn->setSelected([startSel], [endSel])
 		.breakBounds:
+		; @call [GetScrollRange]([form.editIn.hWnd], addr startSel, addr endSel)
+		@call form.editIn->invalidate()
+		; @call [SetScrollPos]([form.editIn.hWnd], SB_VERT, [endSel], 1)
 	.noAdd:
 	@call CNV::free([_params.wParam])
 	ret
