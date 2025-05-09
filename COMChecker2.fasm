@@ -1,6 +1,6 @@
 define PROGRAM_TYPE GUI 6.0
 
-include "FASM_OOP\x64.inc"
+include "FASM_OOP\x86.inc"
 include "FASM_OOP\STDHEAD.inc"
 include "encoding\win1251.inc"
 include "FASM_OOP\TOOLS.INC"

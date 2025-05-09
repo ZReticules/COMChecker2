@@ -245,6 +245,12 @@ proc PortForm_init uses pbx psi, lpForm, lpParams, lpEventData
 	ret
 endp
 
+; proc PortForm_lButtonDown, lpForm, lpParams, lpEventData
+; 	@virtObj form:arg PortForm at pcx from @arg1
+; 	@call form->setFocus()
+; 	ret
+; endp
+
 proc PortForm.PauseButton_click uses pbx, lpForm, lpParams, lpControl, lpEventData
 	@virtObj form:arg PortForm at pbx from @arg1
 	.buttonOpenTexts @const dq "Пауза", "Пуск"

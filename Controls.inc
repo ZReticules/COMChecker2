@@ -11,12 +11,16 @@ struct SelChangeCombo COMBOBOX
 ends
 
 struct LoseBlueListBox LISTBOX
-	WM_KILLFOCUS event ?
+	LBN_KILLFOCUS event LoseBlueListBox_killFocus
 
 	lastSelected dd ?
 ends
 
-proc LoseBlueListBox_killFocus, lpForm, lpParams, lpControl, lpEventData
-	@virtObj listBox:arg LoseBlueListBox at pbx from @arg1
+proc LoseBlueListBox_killFocus uses pbx, lpForm, lpParams, lpControl, lpEventData
+	@virtObj listBox:arg LoseBlueListBox at pbx from @arg3
+	@call listBox->getSelected()
+	mov [listBox.lastSelected], eax
+	@call c [printf]("%d\n", pax)
+	@call listBox->setSelected()
 	ret
 endp

@@ -36,6 +36,7 @@
 		WM_CTLCOLORBTN  	event PortForm_ctlColor
 		PortForm.WM_COMM	event PortForm_COMIn
 		WM_DEVICECHANGE		event PortForm_deviceChange
+		; WM_LBUTTONDOWN 		event PortForm_lButtonDown
 		WM_CLOSE 			event PortForm_close
 
 		@on_scaling

@@ -164,7 +164,7 @@ $layout _cx: PortForm._cx,\
 					_text: "Пуск",\ 
 					_style: WS_VISIBLE or WS_TABSTOP,\
 					_initvals: PortForm.PauseButton_click
-				; $control LISTBOX,\
+				; $control LoseBlueListBox,\
 				; 	_cx: 20,\
 				; 	_name: tListBox,\ 
 				; 	_style: WS_VISIBLE or WS_TABSTOP
