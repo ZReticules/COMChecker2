@@ -164,10 +164,11 @@ $layout _cx: PortForm._cx,\
 					_text: "Пуск",\ 
 					_style: WS_VISIBLE or WS_TABSTOP,\
 					_initvals: PortForm.PauseButton_click
-				; $control LoseBlueListBox,\
-				; 	_cx: 20,\
-				; 	_name: tListBox,\ 
-				; 	_style: WS_VISIBLE or WS_TABSTOP
+				$control LoseBlueListBox,\
+					_cx: 20,\
+					_padding_top: 2,\
+					_name: listBoxOutFormat,\ 
+					_style: WS_VISIBLE or WS_TABSTOP; or LBS_NOTIFY or LBS_WANTKEYBOARDINPUT 
 				; $control BUTTON,\
 				; 	_style: WS_VISIBLE or WS_GROUP or WS_TABSTOP or BS_AUTORADIOBUTTON,\
 				; 	_text: "HEX"
@@ -208,21 +209,28 @@ $layout _cx: PortForm._cx,\
 				_style: WS_VISIBLE or BS_GROUPBOX,\
 				_style_ex: WS_EX_RIGHT,\
 				_initvals: PortForm_paintGroup
-			$control EDIT,\
+			$control DropDownEdit,\
 				_name: editOut,\
+				_text: "Вы можете перетащить файлы сюда",\
 				_style: WS_VISIBLE or WS_TABSTOP or WS_VSCROLL or ES_MULTILINE or ES_WANTRETURN,\
-				_style_ex: WS_EX_STATICEDGE
+				_style_ex: WS_EX_STATICEDGE or WS_EX_ACCEPTFILES,\
+				<_initvals: PortForm.OutEdit_drop, PortForm.OutEdit_keyDown>
 
 			$layout _orientation: vertical,\
 				_cx: 25 %,\
-				_align: center
+				_x_sticker: EScaleMode.saveEnd,\
+				_padding_left: 5
+
+				$control LoseBlueListBox,\
+					_name: listBoxInFormat,\ 
+					_cy: 33 %,\
+					_style: WS_VISIBLE or WS_TABSTOP; or LBS_NOTIFY or LBS_WANTKEYBOARDINPUT 
 
 				$control PushButton,\
+					_name: buttonSend,\
 					_cy: 34 %,\
-					_x_sticker: EScaleMode.saveEnd,\
-					_padding_left: 5,\
 					_text: "Отправить",\ 
-					_style: WS_VISIBLE or BS_DEFPUSHBUTTON or WS_TABSTOP,\
+					_style: WS_VISIBLE or BS_PUSHBUTTON or WS_TABSTOP,\
 					_initvals: PortForm.SendButton_click
 			$endl
 		$endl

@@ -4,41 +4,37 @@ importlib user32,\
 	GetWindowRect,\
 	DrawEdge,\
 	ReleaseDC,\
-	BeginPaint,\
-	EndPaint,\
 	GetClassNameA,\
 	FillRect,\
 	FrameRect,\
-	GetClientRect
+	GetClientRect,\
+	GetSystemMenu,\
+	AppendMenuA,\
+	ModifyMenuA
 
 importlib gdi32,\
-	Rectangle,\
-	GetStockObject,\
-	SelectObject,\
 	CreateSolidBrush,\
-	DeleteObject,\
-	GetTextExtentPoint32A,\
-	TextOutA
+	DeleteObject
 
 
 proc_noprologue
 
-proc MainForm_init uses pbx pdi psi, lpForm, lpParams, lpEventData
+proc MainForm_init uses pbx psi, lpForm, lpParams, lpEventData
 	@virtObj form:arg MainForm at pbx from @arg1
 
 	@call [form.hIcon] = WND::getStockIcon(SIID.DRIVERAM)
 	@call form->setIcon(pax)
 	@call form->setCornerType(DWMWCP.DONOTROUND)
 
+	@call psi = [GetSystemMenu]([form.hWnd], 0)
+	mov [form.hSysMenu], psi
+	@call [AppendMenuA](psi, MF_SEPARATOR, 0, NULL)
+	@call [AppendMenuA](psi, MF_STRING, ColoredDialog.ID_MENU_THEME, "")
+	@call WND::isThemeLight()
+
 	; theme settings
-	mov [form.textColor], 0xFFFFFF
-	mov [form.backColor], MainForm.MAIN_COLOR
-	@call form->setCaptionColor(MainForm.MAIN_COLOR)
-	@call [EnumChildWindows](\
-		[form.hWnd], ChangeThemeChilds,\
-		ColoredDialog.DarkThemes\
-	)
-	@call [form.bgBrush] = [CreateSolidBrush](MainForm.MAIN_COLOR)
+	@call form->changeTheme(pax)
+
 	local comStr:rb 100
 	@call form.comInfo->make()
 	cmp [form.comInfo.countPorts], 0
@@ -56,6 +52,50 @@ proc MainForm_init uses pbx pdi psi, lpForm, lpParams, lpEventData
 	; @call form.comboPorts->addItem("COM256")
 	@call [form.hDeviceNotify] = COMInfo::registerNotify([form.hWnd], DEVICE_NOTIFY_WINDOW_HANDLE)
 	mov eax, esp
+	ret
+endp
+
+proc MainForm_sysCommand, lpForm, lpParams, lpEventData
+	virtObj .params params at pdx from @arg2
+	xor eax, eax
+	cmp [.params.wParam], ColoredDialog.ID_MENU_THEME
+		jne .return
+	local saveBx:POINTER, saveSi:POINTER, saveDi:POINTER
+	mov [saveBx], pbx
+	mov [saveSi], psi
+	mov [saveDi], pdi
+	@virtObj form:arg MainForm at pbx from @arg1
+	mov eax, [form.isLight]
+	inc eax
+	and eax, 1
+	@call form->changeTheme(pax)
+	@call [InvalidateRect]([form.hWnd], NULL, 1)
+
+	mov psi, [form.lpDevicesMem]
+	@virtObj portForm PortForm at psi + pdi - sizeof.PortForm
+	mov edi, sizeof.PortForm * 256
+	@@:
+		cmp [portForm.hWnd], NULL
+		je .inactive
+			@call portForm->setCaptionColor([form.backColor])
+			mov eax, [form.isLight]
+			@call [EnumChildWindows](\
+				[portForm.hWnd], ColoredDialod.ChangeThemeChilds,\
+				pointer[ColoredDialog.ChildThemes + pax * pointer.size]\
+			)
+			mov eax, [form.isLight]
+			@call [ModifyMenuA]([portForm.hSysMenu], ColoredDialog.ID_MENU_THEME,\ 
+					MF_BYCOMMAND or MF_STRING, ColoredDialog.ID_MENU_THEME, \
+					pointer[ColoredDialog.menuTexts + pax * pointer.size])
+			@call [InvalidateRect]([portForm.hWnd], NULL, 1)
+		.inactive:
+	sub edi, sizeof.PortForm
+	jnz @b
+	mov pbx, [saveBx]
+	mov psi, [saveSi]
+	mov pdi, [saveDi]
+	mov eax, esp
+	.return: 
 	ret
 endp
 
@@ -193,9 +233,9 @@ proc MainForm_close uses pbx psi pdi, lpForm, lpParams, lpEventData
 		.inactive:
 	sub edi, sizeof.PortForm
 	jnz @b
-	@call WND::deleteStockIcon([form.hIcon])
 	@call COMInfo::unregisterNotify([form.hDeviceNotify])
 	@call form.comInfo->unmake()
+	@call WND::deleteStockIcon([form.hIcon])
 	@call [DeleteObject]([form.bgBrush])
 	ret
 endp

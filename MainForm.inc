@@ -2,18 +2,15 @@
 
 
 	struct MainForm ColoredDialog
-		const MAIN_COLOR 	= WND.darkThemeColor; xor 0xFFFFFF
-
 		WM_INITDIALOG 		event MainForm_init
 		WM_CLOSE 			event MainForm_close
 		WM_DEVICECHANGE		event MainForm_deviceChange
+		WM_SYSCOMMAND 		event MainForm_sysCommand
 		; @on_scaling
 
 		comInfo 		COMInfo
 		hDeviceNotify	dptr ?
 		lpDevicesMem	dptr ?
-
-
 
 		const _font equ "Segoe UI Variable"
 		const _cx = 125

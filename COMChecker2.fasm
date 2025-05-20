@@ -1,10 +1,10 @@
 define PROGRAM_TYPE GUI 6.0
 
-include "FASM_OOP\x86.inc"
+include "FASM_OOP\x64.inc"
 include "FASM_OOP\STDHEAD.inc"
 include "encoding\win1251.inc"
 include "FASM_OOP\TOOLS.INC"
-include "FASM_OOP\cstdio.inc"
+; include "FASM_OOP\cstdio.inc"
 include "FASM_OOP\Winuser.inc"
 include "FASM_OOP\DialogForm.inc"
 include "FASM_OOP\String.inc"
@@ -19,13 +19,31 @@ include "PortForm.inc"
 include "MainForm.inc"
 
 importlib kernel32,\
-	ExitProcess
+	ExitProcess,\
+	SetConsoleCP,\
+	SetConsoleOutputCP
+
+importlib advapi32,\
+	RegGetValueA
 
 proc_noprologue 
 
 myForm dForm MainForm
 
 @bss_alloc _PortFormsMem rb sizeof.PortForm * 256
+
+; новый функционал
+; 1. drag&drop в поле ввода
+; 2. отправка по Ctrl+Enter
+; 3. форматы вывода ASCII/HEX
+; 4. Cветлая тема(по умолчанию тема определяется как в системе)
+; 5. Смена темы через системное меню(левый клик по заголовку окна)
+; 6. Форматы ввода ASCII/HEX. Пробел можно использовать как разделитель
+
+; фикс багов
+; 1. ошибка переполнения буфера чтения
+; 2. повисание при попытке установить недопустимый размер буфера/задержку
+; 3. возможное повисание при отправке файла
 
 proc main
 	mov [myForm.lpDevicesMem], _PortFormsMem

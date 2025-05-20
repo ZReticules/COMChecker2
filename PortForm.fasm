@@ -3,7 +3,8 @@ importlib user32,\
 	MapDialogRect,\
 	PostMessageA,\
 	GetScrollRange,\
-	SetScrollPos
+	SetScrollPos,\
+	GetAsyncKeyState 
 importlib gdi32,\
 	CreateSolidBrush,\
 	DeleteObject
@@ -21,6 +22,8 @@ importlib kernel32,\
 	ExitThread,\
 	GetLastError,\
 	GetTickCount
+importlib shell32,\
+	DragAcceptFiles
 
 proc_noprologue
 
@@ -99,6 +102,14 @@ proc PortForm.ThreadProc, lpParam
 				mov edi, [comIface.comstat.cbInQue]
 				mov psi, [lpMem]
 				mov eax, dword[psi]
+				mov ecx, [_params.sizeBuf]
+				sub ecx, eax
+				cmp ecx, edi
+				ja .no_realloc
+					@call psi = CNV::realloc(psi, addr pdi + pax + 4)
+					mov [lpMem], psi
+					mov eax, dword[psi]
+				.no_realloc:
 				@call comIface->read(addr psi + pax + 4, pdi, addr o)
 				@call [WaitForSingleObject]([o.hEvent], -1)
 				@call pdi = comIface->getReadedCount(addr o)
@@ -148,14 +159,31 @@ proc PortForm_init uses pbx psi, lpForm, lpParams, lpEventData
 	@call form->setIcon([parent.hIcon])
 	@call form->setCornerType(DWMWCP.DONOTROUND)
 	@call form->setText(addr form.portName)
-	; @call form.tListBox->addItem("ASCII")
-	; @call form.tListBox->addItem("HEX")
+
+	@call form.listBoxOutFormat->addItem("ASCII")
+	@call form.listBoxOutFormat->addItem("HEX")
+	
+	@call form.listBoxInFormat->addItem("ASCII")
+	@call form.listBoxInFormat->addItem("HEX")
+
+	; append system menu item for theme chamging
+	@call [form.hSysMenu] = [GetSystemMenu]([form.hWnd], 0)
+	@call [AppendMenuA]([form.hSysMenu], MF_SEPARATOR, 0, NULL)
+	mov eax, [parent.isLight]
+	@call [AppendMenuA]([form.hSysMenu], MF_STRING, ColoredDialog.ID_MENU_THEME, \
+			pointer[ColoredDialog.menuTexts + pax * pointer.size])
+
+	; accept Drag&Drop
+	@call [SetWindowPos]([form.buttonSend.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
+	@call [SetWindowPos]([form.editOut.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
+	; @call form.editOut->setPlaceholder(L "You can drag&drop file here")
 
 	; theme settings
 	@call form->setCaptionColor([parent.backColor])
+	mov eax, [parent.isLight]
 	@call [EnumChildWindows](\
-		[form.hWnd], ChangeThemeChilds,\
-		ColoredDialog.DarkThemes\
+		[form.hWnd], ColoredDialod.ChangeThemeChilds,\
+		pointer[ColoredDialog.ChildThemes + pax * pointer.size]\
 	)
 
 	; min/max size settings
@@ -171,6 +199,7 @@ proc PortForm_init uses pbx psi, lpForm, lpParams, lpEventData
 
 	; COMIface settings and delay set
 	local dcb:DCB
+	@call form.comIface->getParams(addr dcb)
 	@call form.comIface->getParams(addr dcb)
 	mov [dcb.BaudRate], 9600
 	; mov [form.threadParams.delay], 1000 / 50
@@ -245,19 +274,20 @@ proc PortForm_init uses pbx psi, lpForm, lpParams, lpEventData
 	ret
 endp
 
-; proc PortForm_lButtonDown, lpForm, lpParams, lpEventData
-; 	@virtObj form:arg PortForm at pcx from @arg1
-; 	@call form->setFocus()
-; 	ret
-; endp
+proc PortForm_sysCommand, lpForm, lpParams, lpEventData
+	virtObj .params params at pdx from @arg2
+	xor eax, eax
+	cmp [.params.wParam], ColoredDialog.ID_MENU_THEME
+		jne .return
+	@virtObj form:arg PortForm at pcx from @arg1
+	@call MainForm_sysCommand([form.lpParent], addr .params, @arg3)
+	mov eax, esp
+	.return: 
+	ret
+endp
 
-proc PortForm.PauseButton_click uses pbx, lpForm, lpParams, lpControl, lpEventData
-	@virtObj form:arg PortForm at pbx from @arg1
-	.buttonOpenTexts @const dq "Пауза", "Пуск"
-	xor [form.isPaused], 1
-	@call form->switchThread()
-	mov eax, [form.isPaused]
-	@call form.buttonPause->setText(addr .buttonOpenTexts + pax * 8)
+proc PortForm_mouseButtonDown, lpForm, lpParams, lpEventData
+	@call DIALOGFORM::setFocus(@arg1)
 	ret
 endp
 
@@ -267,12 +297,129 @@ proc PortForm.ClearButton_click, lpForm, lpParams, lpControl, lpEventData
 	ret
 endp
 
+proc PortForm.streamCallback c, lpString, lParam
+	mov eax, 0
+	ret
+endp
+
+proc PortForm.OutEdit_drop uses pbx psi, lpForm, lpParams, lpControl, lpEventData
+	@virtObj form:arg PortForm at pbx from @arg1
+	@virtObj _params:arg params at psi from @arg2
+	; @virtObj .cntrl:arg CONTROL at pbx from @arg3
+
+	local lpFile:POINTER;, lpFileData:POINTER, lpFile:POINTER
+	; int3
+	with string1:String(0), string2:String(0)
+		@call WND::dragFileNameString(addr string1, [_params.wParam], 0)
+		@call string2->fromChars("Подтвердите отправку файла ", -1)
+		@call string2->addString(addr string1)->getLpChars()
+		@call WND::msgBox(pax, "Подтверждение отправки файла", dwStyle: MB_YESNO)
+		cmp pax, IDYES
+		jne .no_commit
+			@call string1->getLpChars()
+			@call [fopen](pax, "rb+")
+			mov [lpFile], pax
+			@call string1->streamRead(pax, 0Ah, NULL, PortForm.streamCallback, NULL)
+			@call string1->getLpChars()
+			@call form.comIface->write(pax, [string1.len], addr form.overlapped)
+			@call [WaitForSingleObject]([form.overlapped.hEvent], 1000)
+			@call [fclose]([lpFile])
+		.no_commit:
+	end_with
+	; int3
+	ret
+endp
+
+proc strHexToBytes c uses psi pdi pbx, lpString
+	@virtObj string:arg String at pbx from @arg1
+	@call string->getLpChars()
+	mov psi, pax
+	mov pdi, pax
+	xor edx, edx
+	xor ecx, ecx
+	xor eax, eax
+	@@:
+		lodsb
+		switch pax
+			case +"0" ... +"9"
+				sub eax, "0"
+				jmp end_case
+			case +"a" ... +"f"
+				sub eax, "a" - "A"
+			case +"A" ... +"F"
+				sub eax, "A" - 10
+				jmp end_case
+			case " "
+				test ecx, 1
+					jz @b
+				xor ecx, 1
+				mov eax, edx
+				stosb
+				xor edx, edx
+				jmp @b
+			case 0
+				test ecx, 1
+				jz .no_save1
+					mov eax, edx
+					stosb
+				.no_save1:
+				mov byte[pdi + 1], 0
+				@call string->getLpChars()
+				sub pdi, pax
+				mov [string.len], edi
+				ret
+			case_default
+				mov pax, 0
+				ret
+		end_switch
+		shl edx, 4
+		add edx, eax
+		test ecx, 1
+		jz .no_save2
+			mov eax, edx
+			xor edx, edx
+			stosb
+		.no_save2:
+		xor ecx, 1
+	jmp @b
+endp
+
 proc PortForm.SendButton_click uses pbx, lpForm, lpParams, lpControl, lpEventData
 	@virtObj form:arg PortForm at pbx from @arg1
 	@call form.editOut->getString(addr form.strBuf)
+	; int3
+	cmp [form.listBoxInFormat.lastSelected], 1
+	jne .no_convert
+		@call c strHexToBytes(addr form.strBuf)
+		cmp eax, 0
+		jne .no_error
+			@call WND::msgBox("Неверный формат ввода!")
+			ret
+		.no_error:
+	.no_convert:
 	@call form.strBuf->getLpChars()
 	@call form.comIface->write(pax, [form.strBuf.len], addr form.overlapped)
 	@call [WaitForSingleObject]([form.overlapped.hEvent], -1)
+	ret
+endp
+
+proc PortForm.OutEdit_keyDown, lpForm, lpParams, lpControl, lpEventData
+	@sarg @arg1
+	virtObj .params params at pcx from @arg2
+	; @call c [printf]("%d, %d\n", [.params.wParam], VK_RETURN)
+	switch [.params.wParam]
+		case VK_RETURN
+			@sarg @arg2, @arg3, @arg4
+
+			@call c [GetAsyncKeyState](VK_CONTROL)
+			test pax, 0x8000
+				cmovz pcx, [lpParams]
+				jz end_case
+			@call PortForm.SendButton_click([lpForm], [lpParams], [lpControl], [lpEventData])
+			mov pax, 0
+			ret
+	end_switch
+	@call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
 	ret
 endp
 
@@ -334,57 +481,72 @@ proc PortForm.SetupButton_clicked uses pbx psi, lpForm, lpParams, lpControl, lpE
 
 	.error:
 		@call WND::msgBox(pdx)
+		mov [retAddr], .after_error
+		test [form.isPaused], 1
+			jz .pause
+		.after_error:
 		ret
 endp
 
-; proc PortForm.asciiToHex uses psi pdi, lpMem, lpSize
-; 	@sarg @arg1, @arg2
-; 	@larg psi, @arg1
+proc PortForm.PauseButton_click uses pbx, lpForm, lpParams, lpControl, lpEventData
+	@virtObj form:arg PortForm at pbx from @arg1
+	.buttonOpenTexts @const dq "Пауза", "Пуск"
+	xor [form.isPaused], 1
+	@call form->switchThread()
+	mov eax, [form.isPaused]
+	@call form.buttonPause->setText(addr .buttonOpenTexts + pax * 8)
+	ret
+endp
 
-; 	local lpDest:POINTER
-; 	mov ecx, dword[psi]
-; 	@call pdi = CNV::alloc(addr pcx * 3 + 4)
-; 	mov [lpDest], pdi
-; 	mov ecx, dword[psi]
+proc PortForm.asciiToHex uses psi pdi, lpMem, lpSize
+	@sarg @arg1, @arg2
+	@larg psi, @arg1
+
+	local lpDest:POINTER
+	mov ecx, dword[psi]
+	@call pdi = CNV::alloc(addr pcx * 3 + 4)
+	mov [lpDest], pdi
+	mov ecx, dword[psi]
 	
-; 	lea pax, [pcx * 3]
-; 	mov dword[pdi], eax
+	; each byte now requires 3 bytes space: high 4 bits, low 4 bits and space
+	lea pax, [pcx * 3]
+	mov dword[pdi], eax
 
-; 	mov pdx, [lpSize]
-; 	mov dword[pdx], eax
+	mov pdx, [lpSize]
+	mov dword[pdx], eax
 	
-; 	add psi, 4
-; 	add pdi, 4
-; 	; mov pbx, pcx
+	; correct space for length of array
+	add psi, 4
+	add pdi, 4
 
-; 	.convert_loop:
-; 		xor eax, eax
-; 		lodsb
-; 		mov edx, eax
+	.convert_loop:
+		xor eax, eax
+		lodsb
+		mov edx, eax
 
 
-; 		and eax, 0xF
-; 		shl eax, 8
-; 		cmp eax, 0x900
-; 		jbe @f
-; 			add eax, (0x4000 - 0x3900)
-; 		@@:
+		and eax, 0xF
+		shl eax, 8
+		cmp eax, 0x900
+		jbe @f
+			add eax, (0x4000 - 0x3900)
+		@@:
 
-; 		shr edx, 4
-; 		and edx, 0xF
-; 		cmp edx, 0x9
-; 		jbe @f
-; 			add edx, (0x40 - 0x39)
-; 		@@:
-; 		lea eax, [eax + edx + 0x200000 + 0x3030]
-; 		stosd
-; 		dec pdi
-; 	loop .convert_loop
+		shr edx, 4
+		and edx, 0xF
+		cmp edx, 0x9
+		jbe @f
+			add edx, (0x40 - 0x39)
+		@@:
+		lea eax, [eax + edx + 0x200000 + 0x3030]
+		stosd
+		dec pdi
+	loop .convert_loop
 
-; 	@call CNV::free([lpMem])
-; 	mov pax, [lpDest]
-; 	ret
-; endp
+	@call CNV::free([lpMem])
+	mov pax, [lpDest]
+	ret
+endp
 
 proc PortForm_COMIn uses pbx psi, lpForm, lpParams, lpEventData
 	@virtObj form:arg PortForm at pbx from @arg1
@@ -395,42 +557,49 @@ proc PortForm_COMIn uses pbx psi, lpForm, lpParams, lpEventData
 		endSel 		dd ?
 	endl
 	cmp [_params.wParam], NULL
-	jne .noError
+	jne .no_error
 		@call form->close()
 		ret
-	.noError:
+	.no_error:
 	; @call c [printf]("%d\n", [_params.lParam])
 	test [form.isPaused], 1
-	jnz .noAdd
-		; @call [_params.wParam] = PortForm.asciiToHex([_params.wParam], addr _params.lParam)
-		; @call PortForm.asciiToHex([_params.wParam], [_params.lParam])
+	jnz .no_add
+		cmp [form.listBoxOutFormat.lastSelected], 0
+		je .no_hex
+			@call [_params.wParam] = PortForm.asciiToHex([_params.wParam], addr _params.lParam)
+		.no_hex:
+		cmp [_params.lParam], EDIT.LIMIT_TEXT
+		jbe .no_fill
+			mov pcx, [_params.wParam]
+			mov pax, [_params.lParam]
+			@call form.editIn->setText(addr pcx + 4 + pax - EDIT.LIMIT_TEXT)
+			@call form.editIn->setSelected(EDIT.LIMIT_TEXT, EDIT.LIMIT_TEXT)
+			@call [SendMessageA]([form.editIn.hWnd], EM_SCROLLCARET, 0, 0)
+			jmp .no_add
+		.no_fill:
 		@call form.editIn->setRedraw(0)
 		@call form.editIn->getSelected(addr startSel, addr endSel)
 		@call form.editIn->getTextLen()
 		mov [textLen], eax
 		add pax, [_params.lParam]
 		cmp eax, EDIT.LIMIT_TEXT
-		js @f
+		js .overflow_limit
 			shr eax, 2
 			sub [textLen], eax
 			sub [startSel], eax
 			sub [endSel], eax
 			@call form.editIn->setSelected(0, eax)
 			@call form.editIn->replaceSelected("")
-		@@:
-		; @call c [printf]("%d\n", eax)
+		.overflow_limit:
 		@call form.editIn->setSelected([textLen], [textLen])
 		@call form.editIn->setRedraw(1)
 		mov pax, [_params.wParam]
 		@call form.editIn->replaceSelected(addr pax + 4)
 		cmp [startSel], 0
-		jl .breakBounds
+		jl .break_bounds
 			@call form.editIn->setSelected([startSel], [endSel])
-		.breakBounds:
-		; @call [GetScrollRange]([form.editIn.hWnd], addr startSel, addr endSel)
-		@call form.editIn->invalidate()
-		; @call [SetScrollPos]([form.editIn.hWnd], SB_VERT, [endSel], 1)
-	.noAdd:
+		.break_bounds:
+	.no_add:
 	@call CNV::free([_params.wParam])
 	ret
 endp
@@ -467,7 +636,6 @@ proc PortForm_close uses pbx, lpForm, lpParams, lpEventData
 		@call form->switchThread()
 	.no_paused:
 	@call [SetEvent]([form.threadParams.hStopEvent])
-	; @call c [puts]("prepare to stop")
 	@call [WaitForSingleObject]([form.hThread], -1)
 	@call [CloseHandle]([form.hThread])
 	@call [CloseHandle]([form.threadParams.hCOMEvent])
@@ -479,3 +647,32 @@ proc PortForm_close uses pbx, lpForm, lpParams, lpEventData
 endp
 
 proc_resprologue
+
+
+; proc PortForm_itemKey uses pbx psi, lpForm, lpParams, lpEventData
+; 	@virtObj form:arg PortForm at pbx from @arg1
+; 	@virtObj _params params at pdx from @arg2
+; 	mov pax, [_params.lParam]
+; 	cmp pax, [form.listBoxOutFormat.hWnd]
+; 		jne .return
+; 	@call c [printf]("%d\n", word[_params.wParam])
+; 	local incrementor:dd 1, lpListBox:POINTER
+; 	@call [lpListBox] = [GetWindowPtrA]([_params.wParam], GWL_USERDATA)	
+; 	switch word[_params.wParam] 
+; 		case VK_RETURN
+; 			movzx eax, word[_params.wParam + 2]
+; 			mov [form.listBoxOutFormat.lastSelected], eax
+; 			jmp end_case
+; 		case VK_UP
+; 			mov [incrementor], -1
+; 		case VK_DOWN
+; 			@call LISTBOX::getCount([lpListBox])
+; 			mov esi, eax
+; 			movzx eax, word[_params.wParam + 2]
+; 			add eax, [incrementor]
+; 			xor edx, edx
+; 			div esi
+; 			@call LISTBOX::setSelected(edx)
+; 	end_switch
+; 	.return: ret
+; endp

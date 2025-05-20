@@ -36,13 +36,17 @@
 		WM_CTLCOLORBTN  	event PortForm_ctlColor
 		PortForm.WM_COMM	event PortForm_COMIn
 		WM_DEVICECHANGE		event PortForm_deviceChange
-		; WM_LBUTTONDOWN 		event PortForm_lButtonDown
+		WM_LBUTTONDOWN 		event PortForm_mouseButtonDown
+		WM_RBUTTONDOWN 		event PortForm_mouseButtonDown
+		WM_SYSCOMMAND 		event PortForm_sysCommand
+		; WM_VKEYTOITEM		event PortForm_itemKey
 		WM_CLOSE 			event PortForm_close
 
 		@on_scaling
 		@set_min_max_sizes PortForm._cx + 10, PortForm._cy, 1920, 1080
 
 		lpParent 			dptr ?
+		hSysMenu  			dptr ?
 		portName			db "COM"
 		portIndex 			rb 5
 		hThread 			dptr ?
@@ -58,7 +62,7 @@
 		include "PortForm_markup.inc"
 	ends
 
-	ShblDialog_Mem PortForm, "",  WS_VISIBLE or WS_SYSMENU or WS_MINIMIZEBOX or DS_CENTER or DS_SETFONT or WS_SIZEBOX or WS_MAXIMIZEBOX
+	ShblDialog_Mem_Ex PortForm, "",  WS_VISIBLE or WS_SYSMENU or WS_MINIMIZEBOX or DS_CENTER or DS_SETFONT or WS_SIZEBOX or WS_MAXIMIZEBOX
 
 	include "PortForm.fasm"
 @endm
