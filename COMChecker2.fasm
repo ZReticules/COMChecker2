@@ -23,9 +23,6 @@ importlib kernel32,\
 	SetConsoleCP,\
 	SetConsoleOutputCP
 
-importlib advapi32,\
-	RegGetValueA
-
 proc_noprologue 
 
 myForm dForm MainForm
