@@ -130,7 +130,7 @@ endp
 
 proc ColoredDialod.ChangeThemeChilds uses psi, hWnd, vlThemeNames
 	@sarg @arg1, @arg2
-	@call [GetWindowPtrA](@arg1, GWL_USERDATA)
+	@call DLG::getPtr(@arg1)
 	test eax, eax
 	jz .continue
 		local className:rw 257, hThemeOld:POINTER, hThemeNew:POINTER

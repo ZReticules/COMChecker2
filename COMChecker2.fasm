@@ -1,4 +1,4 @@
-define PROGRAM_TYPE GUI 6.0
+define PROGRAM_TYPE GUI
 
 include "FASM_OOP\x64.inc"
 include "FASM_OOP\STDHEAD.inc"
@@ -8,8 +8,7 @@ include "FASM_OOP\TOOLS.INC"
 include "FASM_OOP\Winuser.inc"
 include "FASM_OOP\DialogForm.inc"
 include "FASM_OOP\String.inc"
-include "FASM_OOP\COMPort\COMInfo.inc"
-include "FASM_OOP\COMPort\COMIface.inc"
+include "FASM_OOP\COMPort.inc"
 
 entry main
 
@@ -59,6 +58,6 @@ data resource
            1, LANG_ENGLISH or SUBLANG_DEFAULT, manifest
 
 	resdata manifest
-		file "TOOLS\manifest.xml"
+		file "FASM_OOP\manifest.xml"
 	endres
 end data
