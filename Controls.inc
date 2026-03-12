@@ -1,4 +1,4 @@
-proc_noprologue
+@module Controls
 
 struct PushButton BUTTON
 	BN_CLICKED event ?
@@ -22,45 +22,45 @@ struct LoseBlueListBox LISTBOX
 	LBN_SETFOCUS 	event LoseBlueListBox_takeFocus
 	WM_GETDLGCODE	hook LoseBlueListBox_keyDown
 
-	lastSelected dd ?
+	lastSelected rd 1
 ends
 
-proc LoseBlueListBox_killFocus uses pbx, lpForm, lpParams, lpControl, lpEventData
-	virtObj .listBox:arg LoseBlueListBox at pbx from @arg3
-	@call .listBox->getSelected()
+.proc_frame_mode_static
+
+.proc stdcall LoseBlueListBox_killFocus(.p_form, .p_params, .p_control, .p_eventData) uses pbx
+	virtObj .listBox LoseBlueListBox at pbx from @arg3
+	$call .listBox::getSelected()
 	mov [.listBox.lastSelected], eax
-	@call .listBox->setSelected()
+	$call .listBox::setSelected()
 	ret
-endp
+.endp
 
-proc LoseBlueListBox_takeFocus, lpForm, lpParams, lpControl, lpEventData
-	virtObj .listBox:arg LoseBlueListBox at pcx from @arg3
-	; @call listBox->getSelected()
-	; mov [listBox.lastSelected], eax
-	; @call c [printf]("%d\n", pax)
-	@call .listBox->setSelected([.listBox.lastSelected])
+.proc stdcall LoseBlueListBox_takeFocus(.p_form, .p_params, .p_control, .p_eventData)
+	virtObj .listBox LoseBlueListBox at pcx from @arg3
+	$call .listBox::setSelected([.listBox.lastSelected])
 	ret
-endp
+.endp
 
-proc LoseBlueListBox_keyDown uses psi, lpForm, lpParams, lpControl, lpEventData
+.proc stdcall LoseBlueListBox_keyDown(.p_form, .p_params, .p_control, .p_eventData) uses psi
 	virtObj .params params at pcx from @arg2
-	; @call c [printf]("%d, %d\n", [.params.wParam], VK_RETURN)
 	switch [.params.wParam]
 		case VK_RETURN
 			@sarg @arg2
 
-			local saveBx:POINTER
-			mov [saveBx], pbx
-			virtObj .listBox:arg LoseBlueListBox at pbx from @arg3
-			@call .listBox->getSelected()
+			.local .saveBx:POINTER
+			mov [.saveBx], pbx
+			virtObj .listBox LoseBlueListBox at pbx from @arg3
+			$call .listBox::getSelected()
 			mov [.listBox.lastSelected], eax
-			mov pbx, [saveBx]
+			mov pbx, [.saveBx]
 
-			mov pcx, [lpParams]
+			mov pcx, [.p_params]
 		case_default
-			@call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
+			$call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
 	end_switch
 	ret
-endp
+.endp
 
-proc_resprologue
+.proc_frame_mode_previous
+
+@endm

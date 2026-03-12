@@ -1,33 +1,3 @@
-define PROGRAM_TYPE GUI 6.0
-
-include "FASM_OOP\x86.inc"
-include "FASM_OOP\STDHEAD.inc"
-include "encoding\win1251.inc"
-include "FASM_OOP\TOOLS.INC"
-; include "FASM_OOP\cstdio.inc"
-include "FASM_OOP\Winuser.inc"
-include "FASM_OOP\DialogForm.inc"
-include "FASM_OOP\String.inc"
-include "FASM_OOP\COMPort.inc"
-
-entry main
-
-include "Controls.inc"
-include "ColoredDialog.inc"
-include "PortForm.inc"
-include "MainForm.inc"
-
-importlib kernel32,\
-	ExitProcess,\
-	SetConsoleCP,\
-	SetConsoleOutputCP
-
-proc_noprologue 
-
-myForm dForm MainForm
-
-@bss_alloc _PortFormsMem rb sizeof.PortForm * 256
-
 ; новый функционал
 ; 1. drag&drop в поле ввода
 ; 2. отправка по Ctrl+Enter
@@ -41,15 +11,39 @@ myForm dForm MainForm
 ; 2. повисание при попытке установить недопустимый размер буфера/задержку
 ; 3. возможное повисание при отправке файла
 
-proc main
+define PROGRAM_TYPE GUI 6.0
+
+include "encoding\win1251.inc"
+include "FASM_OOP\x64.inc"
+include "FASM_OOP\Winuser.inc"
+include "FASM_OOP\DialogForm.inc"
+; include "FASM_OOP\cstdio.inc"
+
+entry main
+
+include "MainForm.inc"
+include "PortForm.inc"
+
+importlib kernel32,\
+	ExitProcess;,\
+	; SetConsoleCP,\
+	; SetConsoleOutputCP
+
+.proc_frame_mode_static 
+
+myForm dForm MainForm
+
+@bss_alloc _PortFormsMem rb sizeof.PortForm * 256
+
+.proc main
 	mov [myForm.lpDevicesMem], _PortFormsMem
-	@call myForm->startNM(NULL)
+	$call myForm::startNM(NULL)
 	.msgLoop:
-		@call myForm->dispatchMessages()
+		$call myForm::dispatchMessages()
 	test eax, eax
 	jnz .msgLoop
-	@call [ExitProcess](0)
-endp
+	$call [ExitProcess](0)
+.endp
 
 data resource
 	directory 	RT_MANIFEST, manifests

@@ -1,189 +1,178 @@
 importlib user32,\
 	EnumChildWindows,\
-	GetWindowDC,\
-	GetWindowRect,\
-	DrawEdge,\
-	ReleaseDC,\
-	GetClassNameA,\
-	FillRect,\
-	FrameRect,\
-	GetClientRect,\
 	GetSystemMenu,\
 	AppendMenuA,\
 	ModifyMenuA
 
 importlib gdi32,\
-	CreateSolidBrush,\
 	DeleteObject
 
 
-proc_noprologue
+.proc_frame_mode_static
 
-proc MainForm_init uses pbx psi, lpForm, lpParams, lpEventData
-	@virtObj form:arg MainForm at pbx from @arg1
+.proc stdcall MainForm_init(.p_form, .p_params, .p_eventData) uses pbx psi
+	virtObj .form MainForm at pbx from @arg1
+	$call [.form.hIcon] = WND|getStockIcon(SIID.DRIVERAM)
+	$call .form::setIcon(pax)
+	$call .form::setCornerType(DWMWCP.DONOTROUND)
 
-	@call [form.hIcon] = WND::getStockIcon(SIID.DRIVERAM)
-	@call form->setIcon(pax)
-	@call form->setCornerType(DWMWCP.DONOTROUND)
-
-	@call psi = [GetSystemMenu]([form.hWnd], 0)
-	mov [form.hSysMenu], psi
-	@call [AppendMenuA](psi, MF_SEPARATOR, 0, NULL)
-	@call [AppendMenuA](psi, MF_STRING, ColoredDialog.ID_MENU_THEME, "")
-	@call WND::isThemeLight()
+	$call psi = [GetSystemMenu]([.form.hWnd], 0)
+	mov [.form.hSysMenu], psi
+	$call [AppendMenuA](psi, MF_SEPARATOR, 0, NULL)
+	$call [AppendMenuA](psi, MF_STRING, ColoredDialog.ID_MENU_THEME, "")
+	$call WND|isThemeLight()
 
 	; theme settings
-	@call form->changeTheme(pax)
+	$call .form::changeTheme(pax)
 
-	local comStr:rb 100
-	@call form.comInfo->make()
-	cmp [form.comInfo.countPorts], 0
+	.local .comStr[100]:BYTE
+	$call .form.comInfo::make()
+	cmp [.form.comInfo.countPorts], 0
 	je .noPorts
-		movzx esi, [form.comInfo.countPorts]
+		movzx esi, [.form.comInfo.countPorts]
 		dec esi
 		.fillCombo:
-			@call form.comInfo->choseId(psi)
-			@call form.comInfo->getPortName(addr comStr, 100)
-			@call form.comboPorts->addItem(addr comStr)
-			@call form.comboPorts->setItemData(pax, psi)
+			$call .form.comInfo::choseId(psi)
+			$call .form.comInfo::getPortName(&.comStr, 100)
+			$call .form.comboPorts::addItem(&.comStr)
+			$call .form.comboPorts::setItemData(pax, psi)
 		dec esi
 		jns .fillCombo
 	.noPorts:
-	; @call form.comboPorts->addItem("COM256")
-	@call [form.hDeviceNotify] = COMInfo::registerNotify([form.hWnd], DEVICE_NOTIFY_WINDOW_HANDLE)
+	; $call .form.comboPorts::addItem("COM256")
+	$call [.form.hDeviceNotify] = COMInfo|registerNotify([.form.hWnd], DEVICE_NOTIFY_WINDOW_HANDLE)
 	mov eax, esp
 	ret
-endp
+.endp
 
-proc MainForm_sysCommand, lpForm, lpParams, lpEventData
+.proc stdcall MainForm_sysCommand(.p_form, .p_params, .p_eventData)
 	virtObj .params params at pdx from @arg2
 	xor eax, eax
 	cmp [.params.wParam], ColoredDialog.ID_MENU_THEME
 		jne .return
-	local saveBx:POINTER, saveSi:POINTER, saveDi:POINTER
-	mov [saveBx], pbx
-	mov [saveSi], psi
-	mov [saveDi], pdi
-	@virtObj form:arg MainForm at pbx from @arg1
-	mov eax, [form.isLight]
+	.local .saveBx:POINTER, .saveSi:POINTER, .saveDi:POINTER
+	mov [.saveBx], pbx
+	mov [.saveSi], psi
+	mov [.saveDi], pdi
+	virtObj .form MainForm at pbx from @arg1
+	mov eax, [.form.isLight]
 	inc eax
 	and eax, 1
-	@call form->changeTheme(pax)
-	@call [InvalidateRect]([form.hWnd], NULL, 1)
+	$call .form::changeTheme(pax)
+	$call [InvalidateRect]([.form.hWnd], NULL, 1)
 
-	mov psi, [form.lpDevicesMem]
-	@virtObj portForm PortForm at psi + pdi - sizeof.PortForm
+	mov psi, [.form.lpDevicesMem]
+	virtObj .portForm PortForm at psi + pdi - sizeof.PortForm
 	mov edi, sizeof.PortForm * 256
 	@@:
-		cmp [portForm.hWnd], NULL
+		cmp [.portForm.hWnd], NULL
 		je .inactive
-			@call portForm->setCaptionColor([form.backColor])
-			mov eax, [form.isLight]
-			@call [EnumChildWindows](\
-				[portForm.hWnd], ColoredDialod.ChangeThemeChilds,\
+			$call .portForm::setCaptionColor([.form.backColor])
+			mov eax, [.form.isLight]
+			$call [EnumChildWindows](\
+				[.portForm.hWnd], ColoredDialod.ChangeThemeChilds,\
 				pointer[ColoredDialog.ChildThemes + pax * pointer.size]\
 			)
-			mov eax, [form.isLight]
-			@call [ModifyMenuA]([portForm.hSysMenu], ColoredDialog.ID_MENU_THEME,\ 
+			mov eax, [.form.isLight]
+			$call [ModifyMenuA]([.portForm.hSysMenu], ColoredDialog.ID_MENU_THEME,\ 
 					MF_BYCOMMAND or MF_STRING, ColoredDialog.ID_MENU_THEME, \
 					pointer[ColoredDialog.menuTexts + pax * pointer.size])
-			@call [InvalidateRect]([portForm.hWnd], NULL, 1)
+			$call [InvalidateRect]([.portForm.hWnd], NULL, 1)
 		.inactive:
 	sub edi, sizeof.PortForm
 	jnz @b
-	mov pbx, [saveBx]
-	mov psi, [saveSi]
-	mov pdi, [saveDi]
+	mov pbx, [.saveBx]
+	mov psi, [.saveSi]
+	mov pdi, [.saveDi]
 	mov eax, esp
 	.return: 
 	ret
-endp
+.endp
 
-proc MainForm_comboPortChanged uses pbx, lpForm, lpParams, lpControl, lpEventData
-	@virtObj form:arg MainForm at pbx from @arg1
+.proc stdcall MainForm_comboPortChanged(.p_form, .p_params, .p_control, .p_eventData) uses pbx
+	virtObj .form MainForm at pbx from @arg1
 
-	@call form.comboPorts->getTextLen()
+	$call .form.comboPorts::getTextLen()
 	switch pax
 		case 0
-			@call form.edDesc->setText(NULL)
-			@call form.edPhysName->setText(NULL)
-			@call form.edCreator->setText(NULL)
-			@call form.edService->setText(NULL)
+			$call .form.edDesc::setText(NULL)
+			$call .form.edPhysName::setText(NULL)
+			$call .form.edCreator::setText(NULL)
+			$call .form.edService::setText(NULL)
 			jmp end_case
 		case_default
-			with infoBuf:String(0)
-				@call form.comboPorts->getSelected()
-				@call form.comboPorts->getItemData(pax)
-				@call form.comInfo->choseId(pax)
+			.with .infoBuf:String(0)
+				$call .form.comboPorts::getSelected()
+				$call .form.comboPorts::getItemData(pax)
+				$call .form.comInfo::choseId(pax)
 
-				@call form.comInfo->getPortInfo(addr infoBuf, COMInfo.DESCRIPTION)
-				@call form.edDesc->setString(addr infoBuf)
+				$call .form.comInfo::getPortInfo(&.infoBuf, COMInfo.DESCRIPTION)
+				$call .form.edDesc::setString(&.infoBuf)
 				
-				@call form.comInfo->getPortInfo(addr infoBuf, COMInfo.MFG)
-				@call form.edCreator->setString(addr infoBuf)
+				$call .form.comInfo::getPortInfo(&.infoBuf, COMInfo.MFG)
+				$call .form.edCreator::setString(&.infoBuf)
 				
-				@call form.comInfo->getPortInfo(addr infoBuf, COMInfo.PHYSIC_NAME)
-				@call form.edPhysName->setString(addr infoBuf)
+				$call .form.comInfo::getPortInfo(&.infoBuf, COMInfo.PHYSIC_NAME)
+				$call .form.edPhysName::setString(&.infoBuf)
 				
-				@call form.comInfo->getPortInfo(addr infoBuf, COMInfo.SERVICE)
-				@call form.edService->setString(addr infoBuf)
-			end_with
+				$call .form.comInfo::getPortInfo(&.infoBuf, COMInfo.SERVICE)
+				$call .form.edService::setString(&.infoBuf)
+			.end_with
 	end_switch
 	ret
-endp
+.endp
 
-proc MainForm_deviceChange uses pbx psi pdi, lpForm, lpParams, lpEventData
-	@virtObj form:arg MainForm at pbx from @arg1
-	locals
-		comInfo 	COMInfo
-		comStr 		db 100 dup (?)
-		comboText 	db 100 dup (?)
-		cbTextLen	dptr ?
-	endl
+.proc stdcall MainForm_deviceChange(.p_form, .p_params, .p_eventData) uses pbx psi pdi
+	virtObj .form MainForm at pbx from @arg1
+	.locals
+		.comStr 		rb 100
+		.comboText 	rb 100
+		.cbTextLen	rptr 1
+	.endl
 
 	; load info about com-ports and fill combobox
-	@call form.comInfo->unmake()
-	@call form.comInfo->make()
-	@call form.comboPorts->setRedraw(0)
-	@call form.comboPorts->getText(addr comboText, 100)
-	mov [cbTextLen], pax
-	@call form.comboPorts->clear()
-	cmp [form.comInfo.countPorts], 0
+	$call .form.comInfo::unmake()
+	$call .form.comInfo::make()
+	$call .form.comboPorts::setRedraw(0)
+	$call .form.comboPorts::getText(&.comboText, 100)
+	mov [.cbTextLen], pax
+	$call .form.comboPorts::clear()
+	cmp [.form.comInfo.countPorts], 0
 	je .noPorts
-		movzx psi, [form.comInfo.countPorts]
+		movzx psi, [.form.comInfo.countPorts]
 		dec psi
 		.fillCombo:
-			@call form.comInfo->choseId(psi)
-			@call form.comInfo->getPortName(addr comStr, 100)
-			@call form.comboPorts->addItem(addr comStr)
-			@call form.comboPorts->setItemData(pax, psi)
+			$call .form.comInfo::choseId(psi)
+			$call .form.comInfo::getPortName(&.comStr, 100)
+			$call .form.comboPorts::addItem(&.comStr)
+			$call .form.comboPorts::setItemData(pax, psi)
 		dec psi	
 		jns .fillCombo
-		cmp [cbTextLen], 0
+		cmp [.cbTextLen], 0
 		je .zeroText
-			@call form.comboPorts->findItem(-1, addr comboText)
+			$call .form.comboPorts::findItem(-1, &.comboText)
 			xor ecx, ecx
 			cmp eax, CB_ERR
 				cmovne pcx, pax
-			@call form.comboPorts->setSelected(ecx)
+			$call .form.comboPorts::setSelected(ecx)
 		.zeroText:
 	.noPorts:
 
 	; update displayed info
-	@call MainForm_comboPortChanged(addr form, NULL, NULL, NULL)
+	$call MainForm_comboPortChanged(&.form, NULL, NULL, NULL)
 
-	@call form.comboPorts->setRedraw(1)
-	@call form.comboPorts->invalidate()
+	$call .form.comboPorts::setRedraw(1)
+	$call .form.comboPorts::invalidate()
 	ret
-endp
+.endp
 
-proc MainForm.OpenButton_clicked uses pbx pdi psi, lpForm, lpParams, lpControl, lpEventData
+.proc stdcall MainForm.OpenButton_clicked(.p_form, .p_params, .p_control, .p_eventData) uses pbx pdi psi
 	.alreadyOpenErr @const db "Порт уже открыт!", 0
 	.outOfBoundsErr @const db "Порт должен быть от 1 до 256!", 0
 
-	@virtObj form:arg MainForm at pbx from @arg1
-	local comName:rb 100
-	@call form.comboPorts->getText(addr comName, 100)
+	virtObj .form MainForm at pbx from @arg1
+	.local .comName[100]:BYTE
+	$call .form.comboPorts::getText(&.comName, 100)
 	test eax, eax
 		jz .return
 	mov eax, 3
@@ -193,7 +182,7 @@ proc MainForm.OpenButton_clicked uses pbx pdi psi, lpForm, lpParams, lpControl, 
 		sub edx, "0"
 		imul edi, edi, 10
 		add edi, edx
-		movzx edx, [comName + pax]
+		movzx edx, [.comName + pax]
 		inc eax
 	test edx, edx
 	jnz @b
@@ -203,41 +192,41 @@ proc MainForm.OpenButton_clicked uses pbx pdi psi, lpForm, lpParams, lpControl, 
 	cmp pdi, 256
 		jae .error
 	imul edi, edi, sizeof.PortForm
-	add pdi, [form.lpDevicesMem]
+	add pdi, [.form.lpDevicesMem]
 
-	@virtObj portForm PortForm at pdi
+	virtObj .portForm PortForm at pdi
 	mov pax, .alreadyOpenErr
-	cmp [portForm.hWnd], NULL
+	cmp [.portForm.hWnd], NULL
 		jne .error
-	@call CNV::fill(pdi, const dForm PortForm, sizeof.PortForm)
-	@call CNV::uintToStr(addr portForm.portIndex, psi, 10)
-	mov [portForm.lpParent], pbx
-	@call portForm->startNM(NULL)
+	$call CNV|fill(pdi, const dForm PortForm, sizeof.PortForm)
+	$call CNV|uintToStr(&.portForm.portIndex, psi, 10)
+	mov [.portForm.lpParent], pbx
+	$call .portForm::startNM(NULL)
 	.return: ret
 
 	.error:
-		@call WND::msgBox(pax)
+		$call WND|msgBox(pax)
 		ret
-endp
+.endp
 
-proc MainForm_close uses pbx psi pdi, lpForm, lpParams, lpEventData
-	@virtObj form:arg MainForm at pbx from @arg1
+.proc stdcall MainForm_close(.p_form, .p_params, .p_eventData) uses pbx psi pdi
+	virtObj .form MainForm at pbx from @arg1
 
-	mov psi, [form.lpDevicesMem]
-	@virtObj portForm PortForm at psi + pdi - sizeof.PortForm
+	mov psi, [.form.lpDevicesMem]
+	virtObj .portForm PortForm at psi + pdi - sizeof.PortForm
 	mov edi, sizeof.PortForm * 256
 	@@:
-		cmp [portForm.hWnd], NULL
+		cmp [.portForm.hWnd], NULL
 		je .inactive
-			@call portForm->close()
+			$call .portForm::close()
 		.inactive:
 	sub edi, sizeof.PortForm
 	jnz @b
-	@call COMInfo::unregisterNotify([form.hDeviceNotify])
-	@call form.comInfo->unmake()
-	@call WND::deleteStockIcon([form.hIcon])
-	@call [DeleteObject]([form.bgBrush])
+	$call COMInfo|unregisterNotify([.form.hDeviceNotify])
+	$call .form.comInfo::unmake()
+	$call WND|deleteStockIcon([.form.hIcon])
+	$call [DeleteObject]([.form.bgBrush])
 	ret
-endp
+.endp
 
-proc_resprologue
+.proc_frame_mode_previous

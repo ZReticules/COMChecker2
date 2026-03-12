@@ -2,337 +2,320 @@ importlib user32,\
 	EnumChildWindows,\
 	MapDialogRect,\
 	PostMessageA,\
-	GetScrollRange,\
-	SetScrollPos,\
 	GetAsyncKeyState 
-importlib gdi32,\
-	CreateSolidBrush,\
-	DeleteObject
+
 importlib kernel32,\
 	CreateEventA,\
 	CloseHandle,\
 	CreateThread,\
-	Sleep,\
 	WaitForMultipleObjects,\
 	WaitForSingleObject,\
 	SetEvent,\
 	ResetEvent,\
-	WaitCommEvent,\
 	TerminateThread,\
 	ExitThread,\
 	GetLastError,\
 	GetTickCount
+
 importlib shell32,\
 	DragAcceptFiles
 
-proc_noprologue
+.proc_frame_mode_static
 
-proc PortForm.switchThread c uses pbx psi, _this
-	@virtObj this:arg PortForm at pcx from @arg1
+.proc cdecl PortForm.switchThread(.pthis) uses psi
+	virtObj .this PortForm at pcx from @arg1
 
-	mov pbx, [this.threadParams.hPauseEvent]
-	mov psi, [this.threadParams.hPausedEvent]
-	@call [SetEvent](pbx)
-	@call [WaitForSingleObject](psi, -1)
-	@call [ResetEvent](psi)
+	mov psi, [.this.threadParams.hPausedEvent]
+	$call [SetEvent]([.this.threadParams.hPauseEvent])
+	$call [WaitForSingleObject](psi, -1)
+	$call [ResetEvent](psi)
 	ret
-endp
+.endp
 
-proc PortForm.ThreadProc, lpParam
-	@virtObj _params COMReadThreadParams at pbx from @arg1
-	locals
-		 comIface 	COMIface
-		 lastTime 	dptr ?
-		 o 			OVERLAPPED
-		 flags 		dptr 0
-		 dcb 		DCB
-		 lpMem		dptr ?
-	endl
+.proc stdcall PortForm.ThreadProc(.p_params)
+	virtObj .params COMReadThreadParams at pbx from @arg1
+	.locals
+		 .comIface 	COMIface
+		 .lastTime 	rptr 1
+		 .ovp 		OVERLAPPED
+		 .flags 	rptr 1
+		 .p_mem		rptr 1
+	.endl
+	mov [.flags], 0
 
-	mov pax, [_params.hCOM]
-	mov [comIface.handle], pax
-	mov [comIface.timeouts.ReadIntervalTimeout], 0x7FFFFFFF
-	mov [comIface.timeouts.ReadTotalTimeoutMultiplier], 0
-	mov [comIface.timeouts.ReadTotalTimeoutConstant], 0
-	@call comIface->setTimeouts()
-	@call comIface->setMask(EV_RXCHAR or EV_TXEMPTY)
-	@call comIface->reset()
-	mov eax, [_params.sizeBuf]
-	@call [lpMem] = CNV::alloc(addr pax * 2 + 4)
-	@call [lastTime] = [GetTickCount]()
-	mov pax, [_params.hCOMEvent]
-	mov [o.hEvent], pax
-	lea psi, [flags]
-	lea pdi, [o]
+	mov pax, [.params.hCOM]
+	mov [.comIface.handle], pax
+	mov [.comIface.timeouts.ReadIntervalTimeout], 0x7FFFFFFF
+	mov [.comIface.timeouts.ReadTotalTimeoutMultiplier], 0
+	mov [.comIface.timeouts.ReadTotalTimeoutConstant], 0
+	$call .comIface::setTimeouts()
+	$call .comIface::setMask(EV_RXCHAR or EV_TXEMPTY)
+	$call .comIface::reset()
+	mov eax, [.params.sizeBuf]
+	$call [.p_mem] = CNV|alloc(addr pax * 2 + 4)
+	$call [.lastTime] = [GetTickCount]()
+	mov pax, [.params.hCOMEvent]
+	mov [.ovp.hEvent], pax
+	lea psi, [.flags]
+	lea pdi, [.ovp]
 	.read_loop:
-		@call comIface->waitEvent(psi, pdi)
-		@call [WaitForMultipleObjects](3, addr _params._events, 0, [_params.delay])
+		$call .comIface::waitEvent(psi, pdi)
+		$call [WaitForMultipleObjects](3, addr .params._events, 0, [.params.delay])
 		switch eax
 			case WAIT_OBJECT_0
-				; @call c [puts]("exit")
-				@call comIface->setMask(0)
-				@call CNV::free([lpMem])
-				@call [ExitThread](0)
+				; $call c [puts]("exit")
+				$call .comIface::setMask(0)
+				$call CNV|free([.p_mem])
+				$call [ExitThread](0)
 			case WAIT_OBJECT_0 + 1
-				; @call c [puts]("pause")
-				@call [ResetEvent]([_params.hPauseEvent])
-				@call [SetEvent]([_params.hPausedEvent])
-				@call [WaitForSingleObject]([_params.hPauseEvent], -1)
-				@call [ResetEvent]([_params.hPauseEvent])
-				@call [SetEvent]([_params.hPausedEvent])
-				@call comIface->reset()
-				mov eax, [_params.sizeBuf]
-				@call CNV::realloc([lpMem], addr pax * 2 + 4)
-				mov [lpMem], pax
+				; $call c [puts]("pause")
+				$call [ResetEvent]([.params.hPauseEvent])
+				$call [SetEvent]([.params.hPausedEvent])
+				$call [WaitForSingleObject]([.params.hPauseEvent], -1)
+				$call [ResetEvent]([.params.hPauseEvent])
+				$call [SetEvent]([.params.hPausedEvent])
+				$call .comIface::reset()
+				mov eax, [.params.sizeBuf]
+				$call CNV|realloc([.p_mem], addr pax * 2 + 4)
+				mov [.p_mem], pax
 				mov dword[pax], 0
-				; @call c [puts]("resume")
+				; $call c [puts]("resume")
 				jmp .read_loop
 			case WAIT_OBJECT_0 + 2
-				; @call c [puts]("input")
-				@call comIface->getStat()
+				; $call c [puts]("input")
+				$call .comIface::getStat()
 				test eax, eax
 				jnz .no_err
-					@call CNV::free([lpMem])
-					@call comIface->setMask(0)
-					@call [PostMessageA]([_params.hWnd], PortForm.WM_COMM, NULL, 0)
-					@call [ExitThread](0)
+					$call CNV|free([.p_mem])
+					$call .comIface::setMask(0)
+					$call [PostMessageA]([.params.hWnd], PortForm.WM_COMM, NULL, 0)
+					$call [ExitThread](0)
 				.no_err:
-				cmp [comIface.comstat.cbInQue], 0
+				cmp [.comIface.comstat.cbInQue], 0
 					je .read_loop
-				mov edi, [comIface.comstat.cbInQue]
-				mov psi, [lpMem]
+				mov edi, [.comIface.comstat.cbInQue]
+				mov psi, [.p_mem]
 				mov eax, dword[psi]
-				mov ecx, [_params.sizeBuf]
+				mov ecx, [.params.sizeBuf]
 				sub ecx, eax
 				cmp ecx, edi
 				ja .no_realloc
-					@call psi = CNV::realloc(psi, addr pdi + pax + 4)
-					mov [lpMem], psi
+					$call psi = CNV|realloc(psi, addr pdi + pax + 4)
+					mov [.p_mem], psi
 					mov eax, dword[psi]
 				.no_realloc:
-				@call comIface->read(addr psi + pax + 4, pdi, addr o)
-				@call [WaitForSingleObject]([o.hEvent], -1)
-				@call pdi = comIface->getReadedCount(addr o)
+				$call .comIface::read(addr psi + pax + 4, pdi, &.ovp)
+				$call [WaitForSingleObject]([.ovp.hEvent], -1)
+				$call pdi = .comIface::getReadedCount(&.ovp)
 				add edi, dword[psi]
 				mov dword[psi], edi
 				shr edi, 1
-				cmp edi, [_params.sizeBuf]
+				cmp edi, [.params.sizeBuf]
 				jae .overflow_buf
-					lea psi, [flags]
-					lea pdi, [o]
-					@call [GetTickCount]()
-					sub eax, dword[lastTime]
-					cmp eax, [_params.delay]
+					lea psi, [.flags]
+					lea pdi, [.ovp]
+					$call [GetTickCount]()
+					sub eax, dword[.lastTime]
+					cmp eax, [.params.delay]
 						jb .read_loop
 				.overflow_buf:
 			case WAIT_TIMEOUT
-				@call [lastTime] = [GetTickCount]()
-				mov pax, [lpMem]
+				$call [.lastTime] = [GetTickCount]()
+				mov pax, [.p_mem]
 				cmp dword[pax], 0
 					je .read_loop
 				mov psi, pax
-				@call [PostMessageA]([_params.hWnd], PortForm.WM_COMM, psi, dword[psi])
-				mov eax, [_params.sizeBuf]
-				@call [lpMem] = CNV::alloc(addr pax * 2 + 4)
-				lea psi, [flags]
+				$call [PostMessageA]([.params.hWnd], PortForm.WM_COMM, psi, dword[psi])
+				mov eax, [.params.sizeBuf]
+				$call [.p_mem] = CNV|alloc(addr pax * 2 + 4)
+				lea psi, [.flags]
 				jmp .read_loop
 			; case_default
-			; 	@call c [printf]("%d", eax)
+			; 	$call c [printf]("%d", eax)
 		end_switch
 	jmp .read_loop
-endp
+.endp
 
-proc PortForm_init uses pbx psi, lpForm, lpParams, lpEventData
-	@virtObj form:arg PortForm at pbx from @arg1
-	@virtObj parent:arg ColoredDialog at psi from [form.lpParent]
+.proc stdcall PortForm_init(.p_form, .p_params, .p_eventData) uses pbx psi
+	virtObj .form PortForm at pbx from @arg1
+	virtObj .parent ColoredDialog at psi from [.form.lpParent]
 
 	; open COM
-	@call form.comIface->openA(addr form.portName)
+	$call .form.comIface::openA(&.form.portName)
 	test pax, pax
-	jnz .noErr
-		@call WND::msgBox("Ошибка открытия порта", NULL, MB_OK, [form.hWnd])
-		@call form->close()
+	jnz .no_err
+		$call WND|msgBox("Ошибка открытия порта", NULL, MB_OK, [.form.hWnd])
+		$call .form::close()
 		ret
-	.noErr:
+	.no_err:
 
 	; base form settings
-	@call form->setIcon([parent.hIcon])
-	@call form->setCornerType(DWMWCP.DONOTROUND)
-	@call form->setText(addr form.portName)
+	$call .form::setIcon([.parent.hIcon])
+	$call .form::setCornerType(DWMWCP.DONOTROUND)
+	$call .form::setText(&.form.portName)
 
-	@call form.listBoxOutFormat->addItem("ASCII")
-	@call form.listBoxOutFormat->addItem("HEX")
+	$call .form.listBoxOutFormat::addItem("ASCII")
+	$call .form.listBoxOutFormat::addItem("HEX")
 	
-	@call form.listBoxInFormat->addItem("ASCII")
-	@call form.listBoxInFormat->addItem("HEX")
+	$call .form.listBoxInFormat::addItem("ASCII")
+	$call .form.listBoxInFormat::addItem("HEX")
 
-	; append system menu item for theme chamging
-	@call [form.hSysMenu] = [GetSystemMenu]([form.hWnd], 0)
-	@call [AppendMenuA]([form.hSysMenu], MF_SEPARATOR, 0, NULL)
-	mov eax, [parent.isLight]
-	@call [AppendMenuA]([form.hSysMenu], MF_STRING, ColoredDialog.ID_MENU_THEME, \
+	; append system menu item for theme changing
+	$call [.form.hSysMenu] = [GetSystemMenu]([.form.hWnd], 0)
+	$call [AppendMenuA]([.form.hSysMenu], MF_SEPARATOR, 0, NULL)
+	mov eax, [.parent.isLight]
+	$call [AppendMenuA]([.form.hSysMenu], MF_STRING, ColoredDialog.ID_MENU_THEME, \
 			pointer[ColoredDialog.menuTexts + pax * pointer.size])
 
 	; accept Drag&Drop
-	@call [SetWindowPos]([form.buttonSend.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
-	@call [SetWindowPos]([form.editOut.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
-	; @call form.editOut->setPlaceholder(L "You can drag&drop file here")
+	$call [SetWindowPos]([.form.buttonSend.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
+	$call [SetWindowPos]([.form.editOut.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
+	; $call .form.editOut::setPlaceholder(L "You can drag&drop file here")
 
 	; theme settings
-	@call form->setCaptionColor([parent.backColor])
-	mov eax, [parent.isLight]
-	@call [EnumChildWindows](\
-		[form.hWnd], ColoredDialod.ChangeThemeChilds,\
+	$call .form::setCaptionColor([.parent.backColor])
+	mov eax, [.parent.isLight]
+	$call [EnumChildWindows](\
+		[.form.hWnd], ColoredDialod.ChangeThemeChilds,\
 		pointer[ColoredDialog.ChildThemes + pax * pointer.size]\
 	)
 
-	; min/max size settings
-	@call [MapDialogRect]([form.hWnd], addr form.minMaxRect)
-	cmp [form.minMaxRect.right], 0
-	jg @f
-		mov [form.minMaxRect.right], 0x7FFFFFFF
-	@@:
-	cmp [form.minMaxRect.bottom], 0
-	jg @f
-		mov [form.minMaxRect.bottom], 0x7FFFFFFF
-	@@:
-
 	; COMIface settings and delay set
-	local dcb:DCB
-	@call form.comIface->getParams(addr dcb)
-	@call form.comIface->getParams(addr dcb)
-	mov [dcb.BaudRate], 9600
-	; mov [form.threadParams.delay], 1000 / 50
-	@call form.comIface->setParams(addr dcb)
+	.local .dcb:DCB
+	$call .form.comIface::getParams(&.dcb)
+	$call .form.comIface::getParams(&.dcb)
+	mov [.dcb.BaudRate], 9600
+	; mov [.form.threadParams.delay], 1000 / 50
+	$call .form.comIface::setParams(&.dcb)
 
 	; comboBaud values set
-	.BaudValues @const dq "75", "110", "134", "150", "300", "600", "1200", \
+	.baudValues @const dq "75", "110", "134", "150", "300", "600", "1200", \
 			"1800", "2400", "4800", "7200", "9600", "14400", "19200", \
 			"38400", "57600", "115200", "128000"
-	mov psi, -.BaudValues.len
+	mov psi, -.baudValues.len
 	@@:
-		@call form.comboBaud->addItem(addr .BaudValues + .BaudValues.len + psi)
+		$call .form.comboBaud::addItem(addr .baudValues + .baudValues.len + psi)
 	add psi, 8
 	jnz @b
-	@call form.comboBaud->setSelected(11)
+	$call .form.comboBaud::setSelected(11)
 
 	; comboByteSize values set
-	local bszNums:dd "4"
+	.local .bszNums:DWORD
+	mov [.bszNums], "4"
 	@@:
-		@call form.comboByteSize->addItem(addr bszNums)
-		inc [bszNums]
-	cmp [bszNums], "8"
+		$call .form.comboByteSize::addItem(&.bszNums)
+		inc [.bszNums]
+	cmp [.bszNums], "8"
 	jle @b
-	movzx pax, [dcb.ByteSize]
-	@call form.comboByteSize->setSelected(addr pax - 4)
+	movzx pax, [.dcb.ByteSize]
+	$call .form.comboByteSize::setSelected(addr pax - 4)
 
 	; comboParity
-	.ParityValues @const dq "Нет", "Нечет", "Чёт", "Маркер", "Пробел"
-	mov psi, -.ParityValues.len
+	.parityValues @const dq "Нет", "Нечет", "Чёт", "Маркер", "Пробел"
+	mov psi, -.parityValues.len
 	@@:
-		@call form.comboParity->addItem(addr .ParityValues + .ParityValues.len + psi)
+		$call .form.comboParity::addItem(addr .parityValues + .parityValues.len + psi)
 	add psi, 8
 	jnz @b
-	@call form.comboParity->setSelected([dcb.Parity])
+	$call .form.comboParity::setSelected([.dcb.Parity])
 
 	; comboStopBits
-	.StopBitsValues @const dd "1", "1.5", "2"
-	mov psi, -.StopBitsValues.len
+	.stopBitsValues @const dd "1", "1.5", "2"
+	mov psi, -.stopBitsValues.len
 	@@:
-		@call form.comboStopBits->addItem(addr .StopBitsValues + .StopBitsValues.len + psi)
+		$call .form.comboStopBits::addItem(addr .stopBitsValues + .stopBitsValues.len + psi)
 	add psi, 4
 	jnz @b
-	@call form.comboStopBits->setSelected([dcb.StopBits])
+	$call .form.comboStopBits::setSelected([.dcb.StopBits])
 
 	; setup editIn
-	@call form.editIn->setLimit(EDIT.LIMIT_TEXT)
+	$call .form.editIn::setLimit(EDIT.LIMIT_TEXT)
 
 	; string buffer init
-	@call form.strBuf->make(0)
+	$call .form.strBuf::make(0)
 
 	; run thread for read from port
-	mov pax, [form.hWnd]
-	mov [form.threadParams.hWnd], pax
-	mov pax, [form.comIface.handle]
-	mov [form.threadParams.hCOM], pax
-	@call [CreateEventA](NULL, 1, 0, NULL)
-	mov [form.overlapped.hEvent], pax
-	mov [form.threadParams.hCOMEvent], pax
-	@call [form.threadParams.hStopEvent] = [CreateEventA](NULL, 1, 0, NULL)
-	@call [form.threadParams.hPauseEvent] = [CreateEventA](NULL, 1, 0, NULL)
-	@call [form.threadParams.hPausedEvent] = [CreateEventA](NULL, 1, 0, NULL)
-	mov [form.threadParams.delay], PortForm.UPDATE_DELAY
-	mov [form.threadParams.sizeBuf], PortForm.COM_BUF_SIZE
-	@call [form.hThread] = [CreateThread](NULL, NULL, PortForm.ThreadProc, addr form.threadParams, 0, 0)
+	mov pax, [.form.hWnd]
+	mov [.form.threadParams.hWnd], pax
+	mov pax, [.form.comIface.handle]
+	mov [.form.threadParams.hCOM], pax
+	$call [CreateEventA](NULL, 1, 0, NULL)
+	mov [.form.overlapped.hEvent], pax
+	mov [.form.threadParams.hCOMEvent], pax
+	$call [.form.threadParams.hStopEvent] = [CreateEventA](NULL, 1, 0, NULL)
+	$call [.form.threadParams.hPauseEvent] = [CreateEventA](NULL, 1, 0, NULL)
+	$call [.form.threadParams.hPausedEvent] = [CreateEventA](NULL, 1, 0, NULL)
+	mov [.form.threadParams.delay], PortForm.UPDATE_DELAY
+	mov [.form.threadParams.sizeBuf], PortForm.COM_BUF_SIZE
+	$call [.form.hThread] = [CreateThread](NULL, NULL, PortForm.ThreadProc, addr .form.threadParams, 0, 0)
 	
 	; stopped by default
-	@call form->switchThread()
+	$call .form::switchThread()
 
-	@call [form.hDeviceNotify] = COMInfo::registerNotify([form.hWnd], DEVICE_NOTIFY_WINDOW_HANDLE)
-	mov [form.isPaused], 1
-	mov eax, esp
+	$call [.form.hDeviceNotify] = COMInfo|registerNotify([.form.hWnd], DEVICE_NOTIFY_WINDOW_HANDLE)
+	mov [.form.isPaused], 1
+	$return esp
+.endp
+
+.proc stdcall PortForm_exitSizeMove(.p_form, .p_params, .p_eventData)
+	$call DIALOGFORM|invalidate(@arg1, NULL, 1)
 	ret
-endp
+.endp
 
-proc PortForm_sysCommand, lpForm, lpParams, lpEventData
+.proc stdcall PortForm_sysCommand(.p_form, .p_params, .p_eventData)
 	virtObj .params params at pdx from @arg2
 	xor eax, eax
 	cmp [.params.wParam], ColoredDialog.ID_MENU_THEME
 		jne .return
-	@virtObj form:arg PortForm at pcx from @arg1
-	@call MainForm_sysCommand([form.lpParent], addr .params, @arg3)
+	virtObj .form PortForm at pcx from @arg1
+	$call MainForm_sysCommand([.form.lpParent], &.params, @arg3)
 	mov eax, esp
 	.return: 
 	ret
-endp
+.endp
 
-proc PortForm_mouseButtonDown, lpForm, lpParams, lpEventData
-	@call DIALOGFORM::setFocus(@arg1)
+.proc stdcall PortForm_mouseButtonDown(.p_form, .p_params, .p_eventData)
+	$call DIALOGFORM|setFocus(@arg1)
 	ret
-endp
+.endp
 
-proc PortForm.ClearButton_click, lpForm, lpParams, lpControl, lpEventData
-	@virtObj form:arg PortForm at pcx from @arg1
-	@call form.editIn->setText("")
+.proc stdcall PortForm.ClearButton_click(.p_form, .p_params, .p_control, .p_eventData)
+	virtObj .form PortForm at pcx from @arg1
+	$call .form.editIn::setText("")
 	ret
-endp
+.endp
 
-proc PortForm.streamCallback c, lpString, lParam
-	mov eax, 0
-	ret
-endp
+.proc stdcall PortForm.OutEdit_drop(.p_form, .p_params, .p_control, .p_eventData) uses pbx psi
+	virtObj .form PortForm at pbx from @arg1
+	virtObj .params params at psi from @arg2
 
-proc PortForm.OutEdit_drop uses pbx psi, lpForm, lpParams, lpControl, lpEventData
-	@virtObj form:arg PortForm at pbx from @arg1
-	@virtObj _params:arg params at psi from @arg2
-	; @virtObj .cntrl:arg CONTROL at pbx from @arg3
-
-	local lpFile:POINTER;, lpFileData:POINTER, lpFile:POINTER
-	; int3
-	with string1:String(0), string2:String(0)
-		@call WND::dragFileNameString(addr string1, [_params.wParam], 0)
-		@call string2->fromChars("Подтвердите отправку файла ", -1)
-		@call string2->addString(addr string1)->getLpChars()
-		@call WND::msgBox(pax, "Подтверждение отправки файла", dwStyle: MB_YESNO)
+	.with .string1:String(0), .string2:String(0)
+		.local .p_file:POINTER
+		$call WND|dragFileNameString(&.string1, [.params.wParam], 0)
+		$call .string2::fromChars("Подтвердите отправку файла ", -1)
+		$call .string2::addString(&.string1)::getLpChars()
+		$call WND|msgBox(pax, "Подтверждение отправки файла", dwStyle: MB_YESNO)
 		cmp pax, IDYES
 		jne .no_commit
-			@call string1->getLpChars()
-			@call [fopen](pax, "rb+")
-			mov [lpFile], pax
-			@call string1->streamRead(pax, 0Ah, NULL, PortForm.streamCallback, NULL)
-			@call string1->getLpChars()
-			@call form.comIface->write(pax, [string1.len], addr form.overlapped)
-			@call [WaitForSingleObject]([form.overlapped.hEvent], 1000)
-			@call [fclose]([lpFile])
+			$call .string1::getLpChars()
+			$call [fopen](pax, "rb+")
+			mov [.p_file], pax
+			$call .string1::streamRead(pax, 0Ah, NULL, .stream_callback, NULL)
+			$call .string1::getLpChars()
+			$call .form.comIface::write(pax, [.string1.len], &.form.overlapped)
+			$call [WaitForSingleObject]([.form.overlapped.hEvent], 1000)
+			$call [fclose]([.p_file])
 		.no_commit:
-	end_with
-	; int3
+	.end_with
 	ret
-endp
+	.proc cdecl .stream_callback(.p_buf, .lParam)
+		$return 0
+	.endp
+.endp
 
-proc strHexToBytes c uses psi pdi pbx, lpString
-	@virtObj string:arg String at pbx from @arg1
-	@call string->getLpChars()
+.proc strHexToBytes(.p_string) uses psi pdi pbx
+	virtObj .string String at pbx from @arg1
+	$call .string::getLpChars()
 	mov psi, pax
 	mov pdi, pax
 	xor edx, edx
@@ -364,9 +347,9 @@ proc strHexToBytes c uses psi pdi pbx, lpString
 					stosb
 				.no_save1:
 				mov byte[pdi + 1], 0
-				@call string->getLpChars()
+				$call .string::getLpChars()
 				sub pdi, pax
-				mov [string.len], edi
+				mov [.string.len], edi
 				ret
 			case_default
 				mov pax, 0
@@ -382,82 +365,81 @@ proc strHexToBytes c uses psi pdi pbx, lpString
 		.no_save2:
 		xor ecx, 1
 	jmp @b
-endp
+.endp
 
-proc PortForm.SendButton_click uses pbx, lpForm, lpParams, lpControl, lpEventData
-	@virtObj form:arg PortForm at pbx from @arg1
-	@call form.editOut->getString(addr form.strBuf)
+.proc stdcall PortForm.SendButton_click(.p_form, .p_params, .p_control, .p_eventData) uses pbx
+	virtObj .form PortForm at pbx from @arg1
+	$call .form.editOut::getString(&.form.strBuf)
 	; int3
-	cmp [form.listBoxInFormat.lastSelected], 1
+	cmp [.form.listBoxInFormat.lastSelected], 1
 	jne .no_convert
-		@call c strHexToBytes(addr form.strBuf)
+		$call c strHexToBytes(&.form.strBuf)
 		cmp eax, 0
 		jne .no_error
-			@call WND::msgBox("Неверный формат ввода!")
+			$call WND|msgBox("Неверный формат ввода!")
 			ret
 		.no_error:
 	.no_convert:
-	@call form.strBuf->getLpChars()
-	@call form.comIface->write(pax, [form.strBuf.len], addr form.overlapped)
-	@call [WaitForSingleObject]([form.overlapped.hEvent], -1)
+	$call .form.strBuf::getLpChars()
+	$call .form.comIface::write(pax, [.form.strBuf.len], &.form.overlapped)
+	$call [WaitForSingleObject]([.form.overlapped.hEvent], -1)
 	ret
-endp
+.endp
 
-proc PortForm.OutEdit_keyDown, lpForm, lpParams, lpControl, lpEventData
+.proc stdcall PortForm.OutEdit_keyDown(.p_form, .p_params, .p_control, .p_eventData)
 	@sarg @arg1
 	virtObj .params params at pcx from @arg2
-	; @call c [printf]("%d, %d\n", [.params.wParam], VK_RETURN)
 	switch [.params.wParam]
 		case VK_RETURN
 			@sarg @arg2, @arg3, @arg4
 
-			@call c [GetAsyncKeyState](VK_CONTROL)
+			$call [GetAsyncKeyState](VK_CONTROL)
 			test pax, 0x8000
-				cmovz pcx, [lpParams]
+				cmovz pcx, [.p_params]
 				jz end_case
-			@call PortForm.SendButton_click([lpForm], [lpParams], [lpControl], [lpEventData])
+			$call PortForm.SendButton_click([.p_form], [.p_params], [.p_control], [.p_eventData])
 			mov pax, 0
 			ret
 	end_switch
-	@call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
+	$call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
 	ret
-endp
+.endp
 
-proc PortForm.SetupButton_clicked uses pbx psi, lpForm, lpParams, lpControl, lpEventData
-	.BaudValues @const dd 75, 110, 134, 150, 300, 600, 1200, \
+.proc stdcall PortForm.SetupButton_clicked(.p_form, .p_params, .p_control, .p_eventData) uses pbx psi
+	.baudValues @const dd 75, 110, 134, 150, 300, 600, 1200, \
 			1800, 2400, 4800, 7200, 9600, 14400, 19200, \
 			38400, 57600, 115200, 128000
-	@virtObj form:arg PortForm at pbx from @arg1
-	local dcb:DCB, retAddr:POINTER
+	virtObj .form PortForm at pbx from @arg1
+	.local .dcb:DCB, .retAddr:POINTER
 	
-	mov [retAddr], .after_pause_1
-	test [form.isPaused], 1
+	mov [.retAddr], .after_pause_1
+	test [.form.isPaused], 1
 		jz .pause
 	.after_pause_1:
 
 	; setup COMIface
-	@call form.comIface->getParams(addr dcb)
-	@call form.comboBaud->getSelected()
-	mov eax, [.BaudValues + pax * 4]
-	mov [dcb.BaudRate], eax
-	@call form.comboParity->getSelected()
-	mov [dcb.Parity], al
-	@call form.comboByteSize->getSelected()
+	$call .form.comIface::getParams(&.dcb)
+	$call .form.comboBaud::getSelected()
+	mov eax, [.baudValues + pax * 4]
+	mov [.dcb.BaudRate], eax
+	$call .form.comboParity::getSelected()
+	mov [.dcb.Parity], al
+	$call .form.comboByteSize::getSelected()
 	add al, 4
-	mov [dcb.ByteSize], al
-	@call form.comboStopBits->getSelected()
-	mov [dcb.StopBits], al
-	@call form.editDelay->getString(addr form.strBuf)
-	@call form.strBuf->parseInt(10)
+	mov [.dcb.ByteSize], al
+	$call .form.comboStopBits::getSelected()
+	mov [.dcb.StopBits], al
+	$call .form.editDelay::getString(&.form.strBuf)
+	$call .form.strBuf::parseInt(10)
 
 	.delayError @const db "Слишком низкая задержка! Не менее 10 мс.", 0
 	mov pdx, .delayError
 	cmp eax, 10
 		jb .error
 	
-	mov [form.threadParams.delay], eax
-	@call form.editBufSize->getString(addr form.strBuf)
-	@call form.strBuf->parseInt(10)
+	mov [.form.threadParams.delay], eax
+	$call .form.editBufSize::getString(&.form.strBuf)
+	$call .form.strBuf::parseInt(10)
 
 	.sizeError @const db "Недопустимый размер буфера! От 512 до 65 536 байт.", 0
 	mov pdx, .sizeError
@@ -466,53 +448,53 @@ proc PortForm.SetupButton_clicked uses pbx psi, lpForm, lpParams, lpControl, lpE
 	cmp eax, 65536
 		ja .error
 
-	mov [form.threadParams.sizeBuf], eax
-	@call form.comIface->setParams(addr dcb)
+	mov [.form.threadParams.sizeBuf], eax
+	$call .form.comIface::setParams(&.dcb)
 
-	mov [retAddr], .after_pause_2
-	test [form.isPaused], 1
+	mov [.retAddr], .after_pause_2
+	test [.form.isPaused], 1
 		jz .pause
 	.after_pause_2:
 	ret
 
 	.pause:
-		@call form->switchThread()
-		jmp [retAddr]
+		$call .form::switchThread()
+		jmp [.retAddr]
 
 	.error:
-		@call WND::msgBox(pdx)
-		mov [retAddr], .after_error
-		test [form.isPaused], 1
+		$call WND|msgBox(pdx)
+		mov [.retAddr], .after_error
+		test [.form.isPaused], 1
 			jz .pause
 		.after_error:
 		ret
-endp
+.endp
 
-proc PortForm.PauseButton_click uses pbx, lpForm, lpParams, lpControl, lpEventData
-	@virtObj form:arg PortForm at pbx from @arg1
+.proc stdcall PortForm.PauseButton_click(.p_form, .p_params, .p_control, .p_eventData) uses pbx
+	virtObj .form PortForm at pbx from @arg1
 	.buttonOpenTexts @const dq "Пауза", "Пуск"
-	xor [form.isPaused], 1
-	@call form->switchThread()
-	mov eax, [form.isPaused]
-	@call form.buttonPause->setText(addr .buttonOpenTexts + pax * 8)
+	xor [.form.isPaused], 1
+	$call .form::switchThread()
+	mov eax, [.form.isPaused]
+	$call .form.buttonPause::setText(addr .buttonOpenTexts + pax * 8)
 	ret
-endp
+.endp
 
-proc PortForm.asciiToHex uses psi pdi, lpMem, lpSize
+.proc stdcall PortForm.asciiToHex(.p_mem, .p_size) uses psi pdi
 	@sarg @arg1, @arg2
 	@larg psi, @arg1
 
-	local lpDest:POINTER
+	.local .p_dest:POINTER
 	mov ecx, dword[psi]
-	@call pdi = CNV::alloc(addr pcx * 3 + 4)
-	mov [lpDest], pdi
+	$call pdi = CNV|alloc(addr pcx * 3 + 4)
+	mov [.p_dest], pdi
 	mov ecx, dword[psi]
 	
 	; each byte now requires 3 bytes space: high 4 bits, low 4 bits and space
 	lea pax, [pcx * 3]
 	mov dword[pdi], eax
 
-	mov pdx, [lpSize]
+	mov pdx, [.p_size]
 	mov dword[pdx], eax
 	
 	; correct space for length of array
@@ -543,121 +525,119 @@ proc PortForm.asciiToHex uses psi pdi, lpMem, lpSize
 		dec pdi
 	loop .convert_loop
 
-	@call CNV::free([lpMem])
-	mov pax, [lpDest]
+	$call CNV|free([.p_mem])
+	mov pax, [.p_dest]
 	ret
-endp
+.endp
 
-proc PortForm_COMIn uses pbx psi, lpForm, lpParams, lpEventData
-	@virtObj form:arg PortForm at pbx from @arg1
-	@virtObj _params:arg params at psi from @arg2
-	locals
-		textLen 	dd ?
-		startSel 	dd ?
-		endSel 		dd ?
-	endl
-	cmp [_params.wParam], NULL
+.proc stdcall PortForm_COMIn(.p_form, .p_params, .p_eventData) uses pbx psi
+	virtObj .form PortForm at pbx from @arg1
+	virtObj .params params at psi from @arg2
+	.locals
+		.textLen 	rd 1
+		.startSel 	rd 1
+		.endSel 		rd 1
+	.endl
+	cmp [.params.wParam], NULL
 	jne .no_error
-		@call form->close()
+		$call .form::close()
 		ret
 	.no_error:
-	; @call c [printf]("%d\n", [_params.lParam])
-	test [form.isPaused], 1
+	; $call c [printf]("%d\n", [.params.lParam])
+	test [.form.isPaused], 1
 	jnz .no_add
-		cmp [form.listBoxOutFormat.lastSelected], 0
+		cmp [.form.listBoxOutFormat.lastSelected], 0
 		je .no_hex
-			@call [_params.wParam] = PortForm.asciiToHex([_params.wParam], addr _params.lParam)
+			$call [.params.wParam] = PortForm.asciiToHex([.params.wParam], &.params.lParam)
 		.no_hex:
-		cmp [_params.lParam], EDIT.LIMIT_TEXT
+		cmp [.params.lParam], EDIT.LIMIT_TEXT
 		jbe .no_fill
-			mov pcx, [_params.wParam]
-			mov pax, [_params.lParam]
-			@call form.editIn->setText(addr pcx + 4 + pax - EDIT.LIMIT_TEXT)
-			@call form.editIn->setSelected(EDIT.LIMIT_TEXT, EDIT.LIMIT_TEXT)
-			@call [SendMessageA]([form.editIn.hWnd], EM_SCROLLCARET, 0, 0)
+			mov pcx, [.params.wParam]
+			mov pax, [.params.lParam]
+			$call .form.editIn::setText(addr pcx + 4 + pax - EDIT.LIMIT_TEXT)
+			$call .form.editIn::setSelected(EDIT.LIMIT_TEXT, EDIT.LIMIT_TEXT)
+			$call [SendMessageA]([.form.editIn.hWnd], EM_SCROLLCARET, 0, 0)
 			jmp .no_add
 		.no_fill:
-		@call form.editIn->setRedraw(0)
-		@call form.editIn->getSelected(addr startSel, addr endSel)
-		@call form.editIn->getTextLen()
-		mov [textLen], eax
-		add pax, [_params.lParam]
+		$call .form.editIn::setRedraw(0)
+		$call .form.editIn::getSelected(&.startSel, &.endSel)
+		$call .form.editIn::getTextLen()
+		mov [.textLen], eax
+		add pax, [.params.lParam]
 		cmp eax, EDIT.LIMIT_TEXT
 		js .overflow_limit
 			shr eax, 2
-			sub [textLen], eax
-			sub [startSel], eax
-			sub [endSel], eax
-			@call form.editIn->setSelected(0, eax)
-			@call form.editIn->replaceSelected("")
+			sub [.textLen], eax
+			sub [.startSel], eax
+			sub [.endSel], eax
+			$call .form.editIn::setSelected(0, eax)
+			$call .form.editIn::replaceSelected("")
 		.overflow_limit:
-		@call form.editIn->setSelected([textLen], [textLen])
-		@call form.editIn->setRedraw(1)
-		mov pax, [_params.wParam]
-		@call form.editIn->replaceSelected(addr pax + 4)
-		cmp [startSel], 0
+		$call .form.editIn::setSelected([.textLen], [.textLen])
+		$call .form.editIn::setRedraw(1)
+		mov pax, [.params.wParam]
+		$call .form.editIn::replaceSelected(addr pax + 4)
+		cmp [.startSel], 0
 		jl .break_bounds
-			@call form.editIn->setSelected([startSel], [endSel])
+			$call .form.editIn::setSelected([.startSel], [.endSel])
 		.break_bounds:
 	.no_add:
-	@call CNV::free([_params.wParam])
+	$call CNV|free([.params.wParam])
 	ret
-endp
+.endp
 
-proc PortForm_deviceChange uses pbx, lpForm, lpParams, lpEventData
-	@virtObj form:arg PortForm at pbx from @arg1
-	@call form.comIface->getStat()
+.proc stdcall PortForm_deviceChange(.p_form, .p_params, .p_eventData) uses pbx
+	virtObj .form PortForm at pbx from @arg1
+	$call .form.comIface::getStat()
 	test pax, pax
 		jnz .return
-	@call form->close()
+	$call .form::close()
 	.return: ret
-endp
+.endp
 
-proc PortForm_ctlColor, lpForm, lpParams, lpEventData
-	@virtObj form:arg PortForm at pcx from @arg1
-	@virtObj parent:arg ColoredDialog at pcx from [form.lpParent]
-	@call ColoredDialog_ctlColor(addr parent, @arg2, @arg3)
+.proc stdcall PortForm_ctlColor(.p_form, .p_params, .p_eventData)
+	virtObj .form PortForm at pcx from @arg1
+	$call ColoredDialog_ctlColor([.form.lpParent], @arg2, @arg3)
 	ret
-endp
+.endp
 
-proc PortForm_paintGroup, lpForm, lpParams, lpControl, lpEventData
-	@virtObj form:arg PortForm at pcx from @arg1
-	@virtObj parent:arg ColoredDialog at pcx from [form.lpParent]
-	@call ColoredDialog_paintGroup(addr parent, @arg2, @arg3, @arg4)
+.proc stdcall PortForm_paintGroup(.p_form, .p_params, .p_control, .p_eventData)
+	virtObj .form PortForm at pcx from @arg1 
+	$call ColoredDialog_paintGroup([.form.lpParent], @arg2, @arg3, @arg4)
 	ret
-endp
+.endp
 
-proc PortForm_close uses pbx, lpForm, lpParams, lpEventData
-	@virtObj form:arg PortForm at pbx from @arg1
-	@call COMInfo::unregisterNotify([form.hDeviceNotify])
-	@call form.strBuf->unmake()
-	test [form.isPaused], 1
+.proc stdcall PortForm_close(.p_form, .p_params, .p_eventData) uses pbx
+	virtObj .form PortForm at pbx from @arg1
+	$call COMInfo|unregisterNotify([.form.hDeviceNotify])
+	$call .form.strBuf::unmake()
+	test [.form.isPaused], 1
 	jz .no_paused
-		@call form->switchThread()
+		$call .form::switchThread()
 	.no_paused:
-	@call [SetEvent]([form.threadParams.hStopEvent])
-	@call [WaitForSingleObject]([form.hThread], -1)
-	@call [CloseHandle]([form.hThread])
-	@call [CloseHandle]([form.threadParams.hCOMEvent])
-	@call [CloseHandle]([form.threadParams.hStopEvent])
-	@call [CloseHandle]([form.threadParams.hPauseEvent])
-	@call [CloseHandle]([form.threadParams.hPausedEvent])
-	@call form.comIface->close()
+	$call [SetEvent]([.form.threadParams.hStopEvent])
+	$call [WaitForSingleObject]([.form.hThread], -1)
+	$call [CloseHandle]([.form.hThread])
+	$call [CloseHandle]([.form.threadParams.hCOMEvent])
+	$call [CloseHandle]([.form.threadParams.hStopEvent])
+	$call [CloseHandle]([.form.threadParams.hPauseEvent])
+	$call [CloseHandle]([.form.threadParams.hPausedEvent])
+	$call .form.comIface::close()
 	ret
-endp
+.endp
 
-proc_resprologue
+.proc_frame_mode_previous
 
 
-; proc PortForm_itemKey uses pbx psi, lpForm, lpParams, lpEventData
-; 	@virtObj form:arg PortForm at pbx from @arg1
+; .proc stdcall PortForm_itemKey uses pbx psi, .p_form, .p_params, .p_eventData
+; 	@virtObj form PortForm at pbx from @arg1
 ; 	@virtObj _params params at pdx from @arg2
 ; 	mov pax, [_params.lParam]
 ; 	cmp pax, [form.listBoxOutFormat.hWnd]
 ; 		jne .return
-; 	@call c [printf]("%d\n", word[_params.wParam])
+; 	$call c [printf]("%d\n", word[_params.wParam])
 ; 	local incrementor:dd 1, lpListBox:POINTER
-; 	@call [lpListBox] = [GetWindowPtrA]([_params.wParam], GWL_USERDATA)	
+; 	$call [lpListBox] = [GetWindowPtrA]([_params.wParam], GWL_USERDATA)	
 ; 	switch word[_params.wParam] 
 ; 		case VK_RETURN
 ; 			movzx eax, word[_params.wParam + 2]
@@ -666,13 +646,13 @@ proc_resprologue
 ; 		case VK_UP
 ; 			mov [incrementor], -1
 ; 		case VK_DOWN
-; 			@call LISTBOX::getCount([lpListBox])
+; 			$call LISTBOX|getCount([lpListBox])
 ; 			mov esi, eax
 ; 			movzx eax, word[_params.wParam + 2]
 ; 			add eax, [incrementor]
 ; 			xor edx, edx
 ; 			div esi
-; 			@call LISTBOX::setSelected(edx)
+; 			$call LISTBOX|setSelected(edx)
 ; 	end_switch
 ; 	.return: ret
-; endp
+; .endp
