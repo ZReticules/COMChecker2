@@ -4,11 +4,13 @@ importlib uxtheme,\
 	SetWindowTheme,\
 	OpenThemeData,\
 	CloseThemeData
+
 importlib user32,\
 	GetClassNameW,\
 	BeginPaint,\
 	EndPaint,\
 	GetUpdateRgn
+
 importlib gdi32,\
 	Rectangle,\
 	CreateSolidBrush,\
@@ -119,7 +121,6 @@ ends
 
 .proc stdcall ColoredDialog_ctlColor(.p_form, .p_params, .p_eventData) uses pbx pdi
 	virtObj .form ColoredDialog at pbx from @arg1
-	; virtObj .params params at pdi from @arg2
 	@larg pdx, @arg2
 	mov pdi, [pdx + params.wParam]
 

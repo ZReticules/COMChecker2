@@ -51,6 +51,7 @@ importlib shell32,\
 	$call .comIface::setTimeouts()
 	$call .comIface::setMask(EV_RXCHAR or EV_TXEMPTY)
 	$call .comIface::reset()
+
 	mov eax, [.params.sizeBuf]
 	$call [.p_mem] = CNV|alloc(addr pax * 2 + 4)
 	$call [.lastTime] = [GetTickCount]()
@@ -58,17 +59,17 @@ importlib shell32,\
 	mov [.ovp.hEvent], pax
 	lea psi, [.flags]
 	lea pdi, [.ovp]
+
 	.read_loop:
 		$call .comIface::waitEvent(psi, pdi)
 		$call [WaitForMultipleObjects](3, addr .params._events, 0, [.params.delay])
 		switch eax
 			case WAIT_OBJECT_0
-				; $call c [puts]("exit")
 				$call .comIface::setMask(0)
 				$call CNV|free([.p_mem])
 				$call [ExitThread](0)
+
 			case WAIT_OBJECT_0 + 1
-				; $call c [puts]("pause")
 				$call [ResetEvent]([.params.hPauseEvent])
 				$call [SetEvent]([.params.hPausedEvent])
 				$call [WaitForSingleObject]([.params.hPauseEvent], -1)
@@ -79,10 +80,9 @@ importlib shell32,\
 				$call CNV|realloc([.p_mem], addr pax * 2 + 4)
 				mov [.p_mem], pax
 				mov dword[pax], 0
-				; $call c [puts]("resume")
 				jmp .read_loop
+
 			case WAIT_OBJECT_0 + 2
-				; $call c [puts]("input")
 				$call .comIface::getStat()
 				test eax, eax
 				jnz .no_err
@@ -91,25 +91,31 @@ importlib shell32,\
 					$call [PostMessageA]([.params.hWnd], PortForm.WM_COMM, NULL, 0)
 					$call [ExitThread](0)
 				.no_err:
+
 				cmp [.comIface.comstat.cbInQue], 0
 					je .read_loop
+
 				mov edi, [.comIface.comstat.cbInQue]
 				mov psi, [.p_mem]
 				mov eax, dword[psi]
 				mov ecx, [.params.sizeBuf]
 				sub ecx, eax
+
 				cmp ecx, edi
 				ja .no_realloc
 					$call psi = CNV|realloc(psi, addr pdi + pax + 4)
 					mov [.p_mem], psi
 					mov eax, dword[psi]
 				.no_realloc:
+
 				$call .comIface::read(addr psi + pax + 4, pdi, &.ovp)
 				$call [WaitForSingleObject]([.ovp.hEvent], -1)
 				$call pdi = .comIface::getReadedCount(&.ovp)
+
 				add edi, dword[psi]
 				mov dword[psi], edi
 				shr edi, 1
+
 				cmp edi, [.params.sizeBuf]
 				jae .overflow_buf
 					lea psi, [.flags]
@@ -119,26 +125,27 @@ importlib shell32,\
 					cmp eax, [.params.delay]
 						jb .read_loop
 				.overflow_buf:
+
 			case WAIT_TIMEOUT
 				$call [.lastTime] = [GetTickCount]()
 				mov pax, [.p_mem]
 				cmp dword[pax], 0
 					je .read_loop
+
 				mov psi, pax
 				$call [PostMessageA]([.params.hWnd], PortForm.WM_COMM, psi, dword[psi])
 				mov eax, [.params.sizeBuf]
 				$call [.p_mem] = CNV|alloc(addr pax * 2 + 4)
 				lea psi, [.flags]
-				jmp .read_loop
-			; case_default
-			; 	$call c [printf]("%d", eax)
+				; jmp .read_loop
+
 		end_switch
 	jmp .read_loop
 .endp
 
 .proc stdcall PortForm_init(.p_form, .p_params, .p_eventData) uses pbx psi
 	virtObj .form PortForm at pbx from @arg1
-	virtObj .parent ColoredDialog at psi from [.form.lpParent]
+	virtObj .parent ColoredDialog at psi from [.form.p_parent]
 
 	; open COM
 	$call .form.comIface::openA(&.form.portName)
@@ -247,7 +254,7 @@ importlib shell32,\
 	$call [.form.threadParams.hPausedEvent] = [CreateEventA](NULL, 1, 0, NULL)
 	mov [.form.threadParams.delay], PortForm.UPDATE_DELAY
 	mov [.form.threadParams.sizeBuf], PortForm.COM_BUF_SIZE
-	$call [.form.hThread] = [CreateThread](NULL, NULL, PortForm.ThreadProc, addr .form.threadParams, 0, 0)
+	$call [.form.hThread] = [CreateThread](NULL, NULL, PortForm.ThreadProc, &.form.threadParams, 0, 0)
 	
 	; stopped by default
 	$call .form::switchThread()
@@ -268,7 +275,7 @@ importlib shell32,\
 	cmp [.params.wParam], ColoredDialog.ID_MENU_THEME
 		jne .return
 	virtObj .form PortForm at pcx from @arg1
-	$call MainForm_sysCommand([.form.lpParent], &.params, @arg3)
+	$call MainForm_sysCommand([.form.p_parent], &.params, @arg3)
 	mov eax, esp
 	.return: 
 	ret
@@ -308,6 +315,7 @@ importlib shell32,\
 		.no_commit:
 	.end_with
 	ret
+
 	.proc cdecl .stream_callback(.p_buf, .lParam)
 		$return 0
 	.endp
@@ -327,11 +335,13 @@ importlib shell32,\
 			case +"0" ... +"9"
 				sub eax, "0"
 				jmp end_case
+
 			case +"a" ... +"f"
 				sub eax, "a" - "A"
 			case +"A" ... +"F"
 				sub eax, "A" - 10
 				jmp end_case
+
 			case " "
 				test ecx, 1
 					jz @b
@@ -340,6 +350,7 @@ importlib shell32,\
 				stosb
 				xor edx, edx
 				jmp @b
+
 			case 0
 				test ecx, 1
 				jz .no_save1
@@ -351,10 +362,13 @@ importlib shell32,\
 				sub pdi, pax
 				mov [.string.len], edi
 				ret
+
 			case_default
 				mov pax, 0
 				ret
+
 		end_switch
+
 		shl edx, 4
 		add edx, eax
 		test ecx, 1
@@ -370,7 +384,6 @@ importlib shell32,\
 .proc stdcall PortForm.SendButton_click(.p_form, .p_params, .p_control, .p_eventData) uses pbx
 	virtObj .form PortForm at pbx from @arg1
 	$call .form.editOut::getString(&.form.strBuf)
-	; int3
 	cmp [.form.listBoxInFormat.lastSelected], 1
 	jne .no_convert
 		$call c strHexToBytes(&.form.strBuf)
@@ -378,6 +391,7 @@ importlib shell32,\
 		jne .no_error
 			$call WND|msgBox("Неверный формат ввода!")
 			ret
+
 		.no_error:
 	.no_convert:
 	$call .form.strBuf::getLpChars()
@@ -389,18 +403,19 @@ importlib shell32,\
 .proc stdcall PortForm.OutEdit_keyDown(.p_form, .p_params, .p_control, .p_eventData)
 	@sarg @arg1
 	virtObj .params params at pcx from @arg2
-	switch [.params.wParam]
-		case VK_RETURN
-			@sarg @arg2, @arg3, @arg4
+	cmp [.params.wParam], VK_RETURN
+	@block jne @fb
+		@sarg @arg2, @arg3, @arg4
 
-			$call [GetAsyncKeyState](VK_CONTROL)
-			test pax, 0x8000
-				cmovz pcx, [.p_params]
-				jz end_case
-			$call PortForm.SendButton_click([.p_form], [.p_params], [.p_control], [.p_eventData])
-			mov pax, 0
-			ret
-	end_switch
+		$call [GetAsyncKeyState](VK_CONTROL)
+		test pax, 0x8000
+			cmovz pcx, [.p_params]
+			jz @fb
+
+		$call PortForm.SendButton_click([.p_form], [.p_params], [.p_control], [.p_eventData])
+		$return 0
+
+	@endb
 	$call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
 	ret
 .endp
@@ -412,10 +427,10 @@ importlib shell32,\
 	virtObj .form PortForm at pbx from @arg1
 	.local .dcb:DCB, .retAddr:POINTER
 	
-	mov [.retAddr], .after_pause_1
+	mov [.retAddr], @f
 	test [.form.isPaused], 1
 		jz .pause
-	.after_pause_1:
+	@@:
 
 	; setup COMIface
 	$call .form.comIface::getParams(&.dcb)
@@ -451,10 +466,10 @@ importlib shell32,\
 	mov [.form.threadParams.sizeBuf], eax
 	$call .form.comIface::setParams(&.dcb)
 
-	mov [.retAddr], .after_pause_2
+	mov [.retAddr], @f
 	test [.form.isPaused], 1
 		jz .pause
-	.after_pause_2:
+	@@:
 	ret
 
 	.pause:
@@ -533,15 +548,18 @@ importlib shell32,\
 .proc stdcall PortForm_COMIn(.p_form, .p_params, .p_eventData) uses pbx psi
 	virtObj .form PortForm at pbx from @arg1
 	virtObj .params params at psi from @arg2
+	
 	.locals
 		.textLen 	rd 1
 		.startSel 	rd 1
 		.endSel 		rd 1
 	.endl
+
 	cmp [.params.wParam], NULL
 	jne .no_error
 		$call .form::close()
 		ret
+
 	.no_error:
 	; $call c [printf]("%d\n", [.params.lParam])
 	test [.form.isPaused], 1
@@ -550,6 +568,7 @@ importlib shell32,\
 		je .no_hex
 			$call [.params.wParam] = PortForm.asciiToHex([.params.wParam], &.params.lParam)
 		.no_hex:
+
 		cmp [.params.lParam], EDIT.LIMIT_TEXT
 		jbe .no_fill
 			mov pcx, [.params.wParam]
@@ -559,9 +578,11 @@ importlib shell32,\
 			$call [SendMessageA]([.form.editIn.hWnd], EM_SCROLLCARET, 0, 0)
 			jmp .no_add
 		.no_fill:
+
 		$call .form.editIn::setRedraw(0)
 		$call .form.editIn::getSelected(&.startSel, &.endSel)
 		$call .form.editIn::getTextLen()
+
 		mov [.textLen], eax
 		add pax, [.params.lParam]
 		cmp eax, EDIT.LIMIT_TEXT
@@ -573,10 +594,12 @@ importlib shell32,\
 			$call .form.editIn::setSelected(0, eax)
 			$call .form.editIn::replaceSelected("")
 		.overflow_limit:
+
 		$call .form.editIn::setSelected([.textLen], [.textLen])
 		$call .form.editIn::setRedraw(1)
 		mov pax, [.params.wParam]
 		$call .form.editIn::replaceSelected(addr pax + 4)
+		
 		cmp [.startSel], 0
 		jl .break_bounds
 			$call .form.editIn::setSelected([.startSel], [.endSel])
@@ -597,13 +620,13 @@ importlib shell32,\
 
 .proc stdcall PortForm_ctlColor(.p_form, .p_params, .p_eventData)
 	virtObj .form PortForm at pcx from @arg1
-	$call ColoredDialog_ctlColor([.form.lpParent], @arg2, @arg3)
+	$call ColoredDialog_ctlColor([.form.p_parent], @arg2, @arg3)
 	ret
 .endp
 
 .proc stdcall PortForm_paintGroup(.p_form, .p_params, .p_control, .p_eventData)
 	virtObj .form PortForm at pcx from @arg1 
-	$call ColoredDialog_paintGroup([.form.lpParent], @arg2, @arg3, @arg4)
+	$call ColoredDialog_paintGroup([.form.p_parent], @arg2, @arg3, @arg4)
 	ret
 .endp
 

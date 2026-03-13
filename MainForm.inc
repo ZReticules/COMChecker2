@@ -1,6 +1,6 @@
 @module MainForm
 
-include "FASM_OOP\COMPort.inc"
+include "FASM_OOP/COMPort.inc"
 
 include "Controls.inc"
 include "ColoredDialog.inc"
@@ -15,7 +15,7 @@ struct MainForm ColoredDialog
 
 	comInfo 		COMInfo
 	hDeviceNotify	dptr ?
-	lpDevicesMem	dptr ?
+	p_devicesMem	dptr ?
 
 	const _font equ "Segoe UI Variable"
 	const _cx = 125

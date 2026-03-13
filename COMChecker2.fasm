@@ -13,11 +13,11 @@
 
 define PROGRAM_TYPE GUI 6.0
 
-include "encoding\win1251.inc"
-include "FASM_OOP\x64.inc"
-include "FASM_OOP\Winuser.inc"
-include "FASM_OOP\DialogForm.inc"
-; include "FASM_OOP\cstdio.inc"
+include "encoding/win1251.inc"
+include "FASM_OOP/x64.inc"
+include "FASM_OOP/Winuser.inc"
+include "FASM_OOP/DialogForm.inc"
+; include "FASM_OOP/cstdio.inc"
 
 entry main
 
@@ -25,18 +25,15 @@ include "MainForm.inc"
 include "PortForm.inc"
 
 importlib kernel32,\
-	ExitProcess;,\
-	; SetConsoleCP,\
-	; SetConsoleOutputCP
+	ExitProcess
 
 .proc_frame_mode_static 
 
+bss _PortFormsMem[256]:PortForm
 myForm dForm MainForm
-
-@bss_alloc _PortFormsMem rb sizeof.PortForm * 256
+store pointer _PortFormsMem at myForm.p_devicesMem
 
 .proc main
-	mov [myForm.lpDevicesMem], _PortFormsMem
 	$call myForm::startNM(NULL)
 	.msgLoop:
 		$call myForm::dispatchMessages()
@@ -52,6 +49,6 @@ data resource
            1, LANG_ENGLISH or SUBLANG_DEFAULT, manifest
 
 	resdata manifest
-		file "FASM_OOP\manifest.xml"
+		file "FASM_OOP/manifest.xml"
 	endres
 end data

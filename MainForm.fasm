@@ -61,7 +61,7 @@ importlib gdi32,\
 	$call .form::changeTheme(pax)
 	$call [InvalidateRect]([.form.hWnd], NULL, 1)
 
-	mov psi, [.form.lpDevicesMem]
+	mov psi, [.form.p_devicesMem]
 	virtObj .portForm PortForm at psi + pdi - sizeof.PortForm
 	mov edi, sizeof.PortForm * 256
 	@@:
@@ -192,7 +192,7 @@ importlib gdi32,\
 	cmp pdi, 256
 		jae .error
 	imul edi, edi, sizeof.PortForm
-	add pdi, [.form.lpDevicesMem]
+	add pdi, [.form.p_devicesMem]
 
 	virtObj .portForm PortForm at pdi
 	mov pax, .alreadyOpenErr
@@ -200,7 +200,7 @@ importlib gdi32,\
 		jne .error
 	$call CNV|fill(pdi, const dForm PortForm, sizeof.PortForm)
 	$call CNV|uintToStr(&.portForm.portIndex, psi, 10)
-	mov [.portForm.lpParent], pbx
+	mov [.portForm.p_parent], pbx
 	$call .portForm::startNM(NULL)
 	.return: ret
 
@@ -212,7 +212,7 @@ importlib gdi32,\
 .proc stdcall MainForm_close(.p_form, .p_params, .p_eventData) uses pbx psi pdi
 	virtObj .form MainForm at pbx from @arg1
 
-	mov psi, [.form.lpDevicesMem]
+	mov psi, [.form.p_devicesMem]
 	virtObj .portForm PortForm at psi + pdi - sizeof.PortForm
 	mov edi, sizeof.PortForm * 256
 	@@:

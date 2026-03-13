@@ -1,6 +1,6 @@
 @module PortForm
 
-include "FASM_OOP\COMPort.inc"
+include "FASM_OOP/COMPort.inc"
 
 include "Controls.inc"
 include "ColoredDialog.inc"
@@ -40,13 +40,13 @@ struct PortForm DIALOGFORM
 	WM_RBUTTONDOWN 		event PortForm_mouseButtonDown
 	WM_SYSCOMMAND 		event PortForm_sysCommand
 	; WM_VKEYTOITEM		event PortForm_itemKey
-	WM_EXITSIZEMOVE 	event PortForm_exitSizeMove
 	WM_CLOSE 			event PortForm_close
 
 	@on_scaling
+	@on_scaling_redraw
 	@set_min_max_sizes PortForm._cx + 10, PortForm._cy, 1920, 1080
 
-	lpParent 			rptr 1
+	p_parent 			rptr 1
 	hSysMenu  			rptr 1
 	portName			db "COM"
 	portIndex 			rb 5
