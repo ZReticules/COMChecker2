@@ -27,7 +27,7 @@ COMChecker2.0, обновление кода и рефакторинг
 </figure>  
 
 <figure>
-	<figcaption>Форма порта(темная тема)</figcaption> 
+	<figcaption>Форма порта</figcaption> 
 	<div>
 		<img src="screenshots/port_dark.png" alt="Image not found" />
 		<img src="screenshots/port_light.png" alt="Image not found" />
