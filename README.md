@@ -12,44 +12,27 @@ COMChecker2.0, обновление кода и рефакторинг
 - Выбор форматов ввода и вывода(ASCII/HEX, для HEX пробел допустим как разделитель)  
 
 # Скриншоты
-<style>
-  .image-container {
-    display: flex; /* Делает контейнер гибким */
-    gap: 10px; /* Расстояние между изображениями */
-    justify-content: center; /* Центрирование: center, flex-start, flex-end, space-between */
-  }
-  .image-container img {
-    max-width: 100%; /* Картинки не вылезают за границы */
-    height: auto;
-  }
-</style>
-
-<div class="image-container">
-	<figure>
-		<figcaption>Стартовая форма(темная тема)</figcaption>
-		<img src="screenshots/main_dark.png" alt="Image not found" />
-	</figure>
-	<figure>
-		<figcaption>Стартовая форма(светлая тема)</figcaption>
-		<img src="screenshots/main_light.png" alt="Image not found" />
-	</figure> 
-</div> 
 
 <figure>
-	<figcaption>Смена темы</figcaption>
+<figcaption>Стартовая форма</figcaption>  
+	<div>
+		<img src="screenshots/main_dark.png" alt="Image not found" />
+		<img src="screenshots/main_light.png" alt="Image not found" />
+	</div>
+</figure> 
+
+<figure>
+<figcaption>Смена темы</figcaption>  
 	<img src="screenshots/change_theme.png" alt="Image not found" />
 </figure>  
 
-<div class="image-container">
-	<figure>
-		<figcaption>Форма порта(темная тема)</figcaption>
+<figure>
+	<figcaption>Форма порта(темная тема)</figcaption> 
+	<div>
 		<img src="screenshots/port_dark.png" alt="Image not found" />
-	</figure>
-	<figure>
-		<figcaption>Форма порта(светлая тема)</figcaption>
 		<img src="screenshots/port_light.png" alt="Image not found" />
-	</figure> 
-</div> 
+	</div> 
+</figure> 
 
 # Компиляция из исходников
 Для компиляции сначала клонируйте репозиторий с подмодулями  
