@@ -15,11 +15,11 @@ $layout _cx: PortForm._cx,\
 			_cy_sticker: EScaleMode.saveStart
 
 		$layout _orientation: horizontal,\
-				_cy: content,\
-				_padding: 4,\
-				_padding_top:4,\
-				_x_sticker: EScaleMode.saveStart,\
-				_cx_sticker: EScaleMode.saveEnd
+			_cy: content,\
+			_padding: 4,\
+			_padding_top:4,\
+			_x_sticker: EScaleMode.saveStart,\
+			_cx_sticker: EScaleMode.saveEnd
 
 			$control ColoredGroup,\
 				_text: "Параметры",\
@@ -27,15 +27,15 @@ $layout _cx: PortForm._cx,\
 				_style: WS_VISIBLE or BS_GROUPBOX,\
 				_style_ex: WS_EX_RIGHT,\
 				_initvals: PortForm_paintGroup
-
 			$layout _orientation: horizontal,\
-					_cy: content,\
-					_space_between: 5,\
-					_x_sticker: EScaleMode.simple,\
-					_cx_sticker: EScaleMode.centerScale
+				_cy: content,\
+				_space_between: 5,\
+				_x_sticker: EScaleMode.simple,\
+				_cx_sticker: EScaleMode.centerScale
 
 				$layout _orientation: vertical,\
-						_cy: content
+					_cy: content
+					
 					$control STATIC,\
 						_cy: PortForm._pointsize,\
 						_text: "Бит в секунду"
@@ -52,9 +52,8 @@ $layout _cx: PortForm._cx,\
 						_style: WS_VISIBLE or WS_TABSTOP or ES_NUMBER,\
 						_style_ex: WS_EX_STATICEDGE,\
 						_text: "20"
-
 					; $layout _orientation: horizontal,\
-					; 		_cy: PortForm._pointsize
+					; 	_cy: PortForm._pointsize
 
 					; 	$control EDIT,\
 					; 		_style_ex: WS_EX_STATICEDGE
@@ -93,9 +92,9 @@ $layout _cx: PortForm._cx,\
 					; 		_style: WS_VISIBLE or UDS_AUTOBUDDY or UDS_SETBUDDYINT or UDS_ALIGNRIGHT or UDS_ARROWKEYS or UDS_NOTHOUSANDS
 					; $endl
 				$endl
-
 				$layout _orientation: vertical,\
-						_cy: content
+					_cy: content
+					
 					$control STATIC,\
 						_cy: PortForm._pointsize,\
 						_text: "Чётность"
@@ -104,7 +103,6 @@ $layout _cx: PortForm._cx,\
 						_cy: 13,\
 						_style: WS_VISIBLE or WS_TABSTOP or CBS_DROPDOWNLIST
 				$endl
-
 				$layout _orientation: vertical
 					$control STATIC,\
 						_cy: PortForm._pointsize,\
@@ -117,24 +115,24 @@ $layout _cx: PortForm._cx,\
 						_padding_top: 7,\
 						_text: "Применить",\ 
 						_style: WS_VISIBLE or WS_TABSTOP,\
-						_initvals: PortForm.SetupButton_clicked
+						_initvals: PortForm.SetupButton_click
 				$endl
 			$endl
 		$endl
 	$endl
 
 	$layout _orientation: vertical,\
-			_padding_right: 5,\
-			_padding_left: 5,\
-			_cy_sticker: EScaleMode.saveEnd,\
-			_y_sticker: EScaleMode.saveStart
+		_padding_right: 5,\
+		_padding_left: 5,\
+		_cy_sticker: EScaleMode.saveEnd,\
+		_y_sticker: EScaleMode.saveStart
 
 		$layout _orientation: vertical,\
-				_padding: 4,\
-				_padding_top:6,\
-				_padding_bottom: 1,\
-				_x_sticker: EScaleMode.saveStart,\
-				_cx_sticker: EScaleMode.saveEnd
+			_padding: 4,\
+			_padding_top:6,\
+			_padding_bottom: 1,\
+			_x_sticker: EScaleMode.saveStart,\
+			_cx_sticker: EScaleMode.saveEnd
 
 			$control ColoredGroup,\
 				_text: "Вывод",\
@@ -143,17 +141,16 @@ $layout _cx: PortForm._cx,\
 				_style_ex: WS_EX_RIGHT,\
 				_initvals: PortForm_paintGroup
 			$control EDIT,\
-				_name: editIn,\
+				_name: editOut,\
 				_style: WS_VISIBLE or WS_VSCROLL or ES_READONLY or ES_MULTILINE,\
 				_style_ex: WS_EX_STATICEDGE
-
 			$layout _orientation: horizontal,\
-					_align: evenly,\
-					_cy: 25 %,\
-					_padding_top: 4,\
-					_y_sticker: EScaleMode.saveEnd,\
-					_x_sticker: EScaleMode.simple,\
-					_cx_sticker: EScaleMode.centerScale
+				_align: evenly,\
+				_cy: 25 %,\
+				_padding_top: 4,\
+				_y_sticker: EScaleMode.saveEnd,\
+				_x_sticker: EScaleMode.simple,\
+				_cx_sticker: EScaleMode.centerScale
 
 				$control PushButton,\
 					_name: buttonPause,\
@@ -189,33 +186,26 @@ $layout _cx: PortForm._cx,\
 	$endl
 
 	$layout _orientation: vertical,\
-			_cy: 30 %,\
-			_padding_right: 5,\
-			_padding_left: 5,\
-			_padding_bottom: 5,\
-			_cy_sticker: EScaleMode.saveEnd,\
-			_y_sticker: EScaleMode.saveEnd,\
-			_x_sticker: EScaleMode.saveStart,\
-			_cx_sticker: EScaleMode.saveEnd
-
+		_cy: 30 %,\
+		_padding_right: 5,\
+		_padding_left: 5,\
+		_padding_bottom: 5,\
+		_cy_sticker: EScaleMode.saveEnd,\
+		_y_sticker: EScaleMode.saveEnd,\
+		_x_sticker: EScaleMode.saveStart,\
+		_cx_sticker: EScaleMode.saveEnd
+		
 		$layout _orientation: horizontal,\
-				_padding: 4,\
-				_padding_top:6,\
-				_padding_bottom: 1
+			_padding: 4,\
+			_padding_top:6,\
+			_padding_bottom: 1
 
-			$control ColoredGroup,\
-				_text: "Ввод",\
-				_position: background,\
-				_style: WS_VISIBLE or BS_GROUPBOX,\
-				_style_ex: WS_EX_RIGHT,\
-				_initvals: PortForm_paintGroup
 			$control DropDownEdit,\
-				_name: editOut,\
+				_name: editIn,\
 				_text: "Вы можете перетащить файлы сюда",\
 				_style: WS_VISIBLE or WS_TABSTOP or WS_VSCROLL or ES_MULTILINE or ES_WANTRETURN,\
 				_style_ex: WS_EX_STATICEDGE or WS_EX_ACCEPTFILES,\
-				<_initvals: PortForm.OutEdit_drop, PortForm.OutEdit_keyDown>
-
+				<_initvals: PortForm.OutEdit_drop, PortForm.OutEdit_getDlgCode>
 			$layout _orientation: vertical,\
 				_cx: 25 %,\
 				_x_sticker: EScaleMode.saveEnd,\
@@ -223,16 +213,27 @@ $layout _cx: PortForm._cx,\
 
 				$control LoseBlueListBox,\
 					_name: listBoxInFormat,\ 
-					_cy: 33 %,\
+					_cy: 25 %,\
 					_style: WS_VISIBLE or WS_TABSTOP; or LBS_NOTIFY or LBS_WANTKEYBOARDINPUT 
-
 				$control PushButton,\
 					_name: buttonSend,\
-					_cy: 34 %,\
 					_text: "Отправить",\ 
+					_padding_bottom: 1,\
 					_style: WS_VISIBLE or BS_PUSHBUTTON or WS_TABSTOP,\
 					_initvals: PortForm.SendButton_click
+				$control PushButton,\
+					_name: buttonFOpen,\
+					_text: "Выбрать файл",\ 
+					_padding_top: 1,\
+					_style: WS_VISIBLE or BS_PUSHBUTTON or WS_TABSTOP,\
+					_initvals: PortForm.FOButton_click
 			$endl
+			$control ColoredGroup,\
+				_text: "Ввод",\
+				_position: background,\
+				_style: WS_VISIBLE or BS_GROUPBOX,\
+				_style_ex: WS_EX_RIGHT,\
+				_initvals: PortForm_paintGroup
 		$endl
 	$endl
 $endl

@@ -122,7 +122,7 @@ ends
 .proc stdcall ColoredDialog_ctlColor(.p_form, .p_params, .p_eventData) uses pbx pdi
 	virtObj .form ColoredDialog at pbx from @arg1
 	@larg pdx, @arg2
-	mov pdi, [pdx + params.wParam]
+	mov pdi, [pdx + Params.wParam]
 
 	$call [SetBkColor](pdi, [.form.backColor])
 	$call [SetTextColor](pdi, [.form.textColor])

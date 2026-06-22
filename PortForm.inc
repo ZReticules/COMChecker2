@@ -1,6 +1,7 @@
 @module PortForm
 
 include "FASM_OOP/COMPort.inc"
+include "FASM_OOP/COM/IFileOpenDialog.inc"
 
 include "Controls.inc"
 include "ColoredDialog.inc"
@@ -40,6 +41,7 @@ struct PortForm DIALOGFORM
 	WM_RBUTTONDOWN 		event PortForm_mouseButtonDown
 	WM_SYSCOMMAND 		event PortForm_sysCommand
 	; WM_VKEYTOITEM		event PortForm_itemKey
+	WM_SHOWWINDOW 		event PortForm_show
 	WM_CLOSE 			event PortForm_close
 
 	@on_scaling
@@ -48,7 +50,7 @@ struct PortForm DIALOGFORM
 
 	p_parent 			rptr 1
 	hSysMenu  			rptr 1
-	portName			db "COM"
+	portName			db "\\.\COM"
 	portIndex 			rb 5
 	hThread 			rptr 1
 	isPaused			rd 1
@@ -57,8 +59,11 @@ struct PortForm DIALOGFORM
 	comIface 			COMIface
 	strBuf  			String
 	hDeviceNotify		rptr 1
+	foDialog 			P_IFileOpenDialog
+
 
 	switchThread 		dm this
+	sendFile			dm this
 
 	include "PortForm_markup.inc"
 ends

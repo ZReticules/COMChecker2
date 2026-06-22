@@ -46,7 +46,7 @@ importlib gdi32,\
 .endp
 
 .proc stdcall MainForm_sysCommand(.p_form, .p_params, .p_eventData)
-	virtObj .params params at pdx from @arg2
+	virtObj .params Params at pdx from @arg2
 	xor eax, eax
 	cmp [.params.wParam], ColoredDialog.ID_MENU_THEME
 		jne .return
@@ -198,6 +198,7 @@ importlib gdi32,\
 	mov pax, .alreadyOpenErr
 	cmp [.portForm.hWnd], NULL
 		jne .error
+		
 	$call CNV|fill(pdi, const dForm PortForm, sizeof.PortForm)
 	$call CNV|uintToStr(&.portForm.portIndex, psi, 10)
 	mov [.portForm.p_parent], pbx

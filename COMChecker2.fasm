@@ -4,18 +4,21 @@
 ; 3. форматы вывода ASCII/HEX
 ; 4. Cветлая тема(по умолчанию тема определяется как в системе)
 ; 5. Смена темы через системное меню(левый клик по заголовку окна)
-; 6. Форматы ввода ASCII/HEX. Пробел можно использовать как разделитель
+; 6. Форматы ввода ASCII/HEX. Пробел можно использовать как разделитель для HEX
+; 7. Формат ввода SCANCODES. В данном режиме символы с клавиатуры отправляются сразу при нажатии, без подтверждения
+; 8. Исправлена навигация по табуляции
 
 ; фикс багов
 ; 1. ошибка переполнения буфера чтения
 ; 2. повисание при попытке установить недопустимый размер буфера/задержку
 ; 3. возможное повисание при отправке файла
+; 4. Обработка неудачной отправки данных по порту
+; 5. Исправлена ошибка открытия порта выше 9-ти
 
 define PROGRAM_TYPE GUI 6.0
 
 include "encoding/win1251.inc"
 include "FASM_OOP/x64.inc"
-include "FASM_OOP/Winuser.inc"
 include "FASM_OOP/DialogForm.inc"
 ; include "FASM_OOP/cstdio.inc"
 
@@ -34,16 +37,20 @@ myForm dForm MainForm
 store pointer _PortFormsMem at myForm.p_devicesMem
 
 .proc main
+	$call [CoInitialize](NULL)
+
 	$call myForm::startNM(NULL)
-	.msgLoop:
+	.msg_loop:
 		$call myForm::dispatchMessages()
 	test eax, eax
-	jnz .msgLoop
+	jnz .msg_loop
+
+	$call [CoUninitialize]()
 	$call [ExitProcess](0)
 .endp
 
 data resource
-	directory 	RT_MANIFEST, manifests
+	directory RT_MANIFEST, manifests
 
 	resource manifests,\ 
            1, LANG_ENGLISH or SUBLANG_DEFAULT, manifest

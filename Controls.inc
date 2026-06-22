@@ -18,21 +18,35 @@ struct DropDownEdit EDIT
 ends
 
 struct LoseBlueListBox LISTBOX
-	LBN_KILLFOCUS 	event LoseBlueListBox_killFocus
-	LBN_SETFOCUS 	event LoseBlueListBox_takeFocus
-	WM_GETDLGCODE	hook LoseBlueListBox_keyDown
+	const SELCHANGED = WM_USER + 1
+
+	LBN_KILLFOCUS 				event LoseBlueListBox_killFocus
+	LBN_SETFOCUS 				event LoseBlueListBox_takeFocus
+	WM_GETDLGCODE				hook LoseBlueListBox_getDlgCode
+	LoseBlueListBox.SELCHANGED 	event NULL
 
 	lastSelected rd 1
 ends
 
 .proc_frame_mode_static
 
-.proc stdcall LoseBlueListBox_killFocus(.p_form, .p_params, .p_control, .p_eventData) uses pbx
+.proc stdcall LoseBlueListBox_killFocus(.p_form, .p_params, .p_control, .p_eventData) uses pbx psi
+	@sarg @arg1
 	virtObj .listBox LoseBlueListBox at pbx from @arg3
-	$call .listBox::getSelected()
-	mov [.listBox.lastSelected], eax
+	
+	mov esi, [.listBox.lastSelected]
+	$call [.listBox.lastSelected] = .listBox::getSelected()
 	$call .listBox::setSelected()
-	ret
+	
+	cmp esi, [.listBox.lastSelected]
+		je .return
+
+	movzx edx, word[.listBox.ID]
+	or edx, LoseBlueListBox.SELCHANGED shl 16
+
+	mov pcx, [.p_form]
+	$call [SendMessageA]([pcx + DIALOGFORM.hWnd], WM_COMMAND, edx, [.listBox.hWnd])
+	.return: ret
 .endp
 
 .proc stdcall LoseBlueListBox_takeFocus(.p_form, .p_params, .p_control, .p_eventData)
@@ -41,23 +55,36 @@ ends
 	ret
 .endp
 
-.proc stdcall LoseBlueListBox_keyDown(.p_form, .p_params, .p_control, .p_eventData) uses psi
-	virtObj .params params at pcx from @arg2
-	switch [.params.wParam]
-		case VK_RETURN
-			@sarg @arg2
+.proc stdcall LoseBlueListBox_getDlgCode(.p_form, .p_params, .p_control, .p_eventData)
+	@sarg @arg1, @arg2
+	virtObj .params Params at pcx from @arg2
+	virtObj .msg MSG at pdx from [.params.lParam]
+	cmp [.params.wParam], VK_RETURN
+	@block jne @fb
+		cmp [.msg.message], WM_KEYDOWN
+			jne @fb
 
-			.local .saveBx:POINTER
-			mov [.saveBx], pbx
-			virtObj .listBox LoseBlueListBox at pbx from @arg3
-			$call .listBox::getSelected()
-			mov [.listBox.lastSelected], eax
-			mov pbx, [.saveBx]
+		.local .saveBx:POINTER
+		mov [.saveBx], pbx
+		virtObj .listBox LoseBlueListBox at pbx from @arg3
+		$call .listBox::getSelected()
+		cmp eax, [.listBox.lastSelected]
+			cmove pbx, [.saveBx]
+			cmove pcx, [.p_params]
+			je @fb
 
-			mov pcx, [.p_params]
-		case_default
-			$call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
-	end_switch
+		mov [.listBox.lastSelected], eax
+
+		movzx edx, word[.listBox.ID]
+		or edx, LoseBlueListBox.SELCHANGED shl 16
+
+		mov pcx, [.p_form]
+		$call [SendMessageA]([pcx + DIALOGFORM.hWnd], WM_COMMAND, edx, [.listBox.hWnd])
+
+		mov pbx, [.saveBx]
+		mov pcx, [.p_params]
+	@endb
+	$call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
 	ret
 .endp
 

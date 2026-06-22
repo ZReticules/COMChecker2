@@ -1,6 +1,7 @@
+include "FASM_OOP/COM/IShellItem.inc"
+
 importlib user32,\
 	EnumChildWindows,\
-	MapDialogRect,\
 	PostMessageA,\
 	GetAsyncKeyState 
 
@@ -12,13 +13,17 @@ importlib kernel32,\
 	WaitForSingleObject,\
 	SetEvent,\
 	ResetEvent,\
-	TerminateThread,\
 	ExitThread,\
 	GetLastError,\
-	GetTickCount
+	GetTickCount,\
+	FormatMessageA,\
+	LocalFree
 
 importlib shell32,\
 	DragAcceptFiles
+
+importlib ole32,\
+	CoTaskMemFree
 
 .proc_frame_mode_static
 
@@ -30,6 +35,26 @@ importlib shell32,\
 	$call [WaitForSingleObject](psi, -1)
 	$call [ResetEvent](psi)
 	ret
+.endp
+
+.proc cdecl PortForm.sendFile(.pthis, .fp) uses pbx
+	virtObj .this PortForm at pbx from @arg1
+	@sarg @arg2
+
+	.with .str:String(0)
+		$call .str::streamRead([.fp], 0Ah, NULL, .stream_callback, NULL)
+		$call .str::getLpChars()
+		$call .this.comIface::write(pax, [.str.len], &.this.overlapped)
+		$call [WaitForSingleObject]([.this.overlapped.hEvent], 1000)
+		cmp eax, WAIT_TIMEOUT
+			jne break_with
+		$call WND|msgBox("Ошибка при отправке данных!", hwndOwner: [.this.hWnd])
+	.end_with
+	ret
+
+	.proc cdecl .stream_callback(.p_buf, .lParam)
+		$return 0
+	.endp
 .endp
 
 .proc stdcall PortForm.ThreadProc(.p_params)
@@ -148,24 +173,49 @@ importlib shell32,\
 	virtObj .parent ColoredDialog at psi from [.form.p_parent]
 
 	; open COM
+	mov [.form.foDialog], NULL
 	$call .form.comIface::openA(&.form.portName)
 	test pax, pax
 	jnz .no_err
-		$call WND|msgBox("Ошибка открытия порта", NULL, MB_OK, [.form.hWnd])
+		.local .dwError:DWORD, .lpBuffer:POINTER
+		$call [.dwError] = [GetLastError]()
+
+		$call [FormatMessageA](FORMAT_MESSAGE_FROM_SYSTEM or FORMAT_MESSAGE_ALLOCATE_BUFFER,\
+			NULL,\
+			[.dwError],\
+			SUBLANG_DEFAULT,\
+			&.lpBuffer,\
+			0,\
+			NULL)
+		; $call WND|msgBox([.lpBuffer], "Ошибка открытия порта", dwStyle: MB_OK, hwndOwner: [.form.hWnd])
+		$call [MessageBoxA]([.form.hWnd], [.lpBuffer], "Ошибка открытия порта", MB_OK)
+		$call [LocalFree]([.lpBuffer])
 		$call .form::close()
+		; .end_with
 		ret
 	.no_err:
+
+	; file open dialog settings
+	$call COM|New(&.form.foDialog, IFileOpenDialog)
+	.local .opts:POINTER
+	$call [.form.foDialog]::GetOptions(&.opts)
+	or [.opts], FOS.FILEMUSTEXIST or FOS.FORCEFILESYSTEM
+	$call [.form.foDialog]::SetOptions([.opts])
+	$call [.form.foDialog]::SetTitle(L "Выберите файл")
+	$call [.form.foDialog]::SetFileTypes(2, <va_list L "Текстовые файлы", L "*.txt", L "Все файлы", L "*">)
 
 	; base form settings
 	$call .form::setIcon([.parent.hIcon])
 	$call .form::setCornerType(DWMWCP.DONOTROUND)
-	$call .form::setText(&.form.portName)
+	$call .form::setText(addr .form.portName + 4)
 
 	$call .form.listBoxOutFormat::addItem("ASCII")
 	$call .form.listBoxOutFormat::addItem("HEX")
 	
 	$call .form.listBoxInFormat::addItem("ASCII")
 	$call .form.listBoxInFormat::addItem("HEX")
+	$call .form.listBoxInFormat::addItem("SCANCODE")
+	mov [.form.listBoxInFormat.LoseBlueListBox.SELCHANGED], PortForm.listBoxInFormat_selected
 
 	; append system menu item for theme changing
 	$call [.form.hSysMenu] = [GetSystemMenu]([.form.hWnd], 0)
@@ -175,9 +225,11 @@ importlib shell32,\
 			pointer[ColoredDialog.menuTexts + pax * pointer.size])
 
 	; accept Drag&Drop
-	$call [SetWindowPos]([.form.buttonSend.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
-	$call [SetWindowPos]([.form.editOut.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
-	; $call .form.editOut::setPlaceholder(L "You can drag&drop file here")
+	; $call [SetWindowPos]([.form.buttonFOpen.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
+	; $call [SetWindowPos]([.form.buttonSend.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
+	; $call [SetWindowPos]([.form.listBoxInFormat.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
+	; $call [SetWindowPos]([.form.editIn.hWnd], HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_DRAWFRAME)
+	; $call .form.editIn::setPlaceholder(L "You can drag&drop file here")
 
 	; theme settings
 	$call .form::setCaptionColor([.parent.backColor])
@@ -235,8 +287,8 @@ importlib shell32,\
 	jnz @b
 	$call .form.comboStopBits::setSelected([.dcb.StopBits])
 
-	; setup editIn
-	$call .form.editIn::setLimit(EDIT.LIMIT_TEXT)
+	; setup editOut
+	$call .form.editOut::setLimit(EDIT.LIMIT_TEXT)
 
 	; string buffer init
 	$call .form.strBuf::make(0)
@@ -264,13 +316,20 @@ importlib shell32,\
 	$return esp
 .endp
 
+.proc PortForm_show(.p_form, .p_params, .p_eventData) uses pbx
+	virtObj .form PortForm at pbx from @arg1
+	$call .form.editIn::setFocus()
+	$call .form.editIn::setSelected(0, EDIT.LIMIT_TEXT)
+	ret
+.endp
+
 .proc stdcall PortForm_exitSizeMove(.p_form, .p_params, .p_eventData)
 	$call DIALOGFORM|invalidate(@arg1, NULL, 1)
 	ret
 .endp
 
 .proc stdcall PortForm_sysCommand(.p_form, .p_params, .p_eventData)
-	virtObj .params params at pdx from @arg2
+	virtObj .params Params at pdx from @arg2
 	xor eax, eax
 	cmp [.params.wParam], ColoredDialog.ID_MENU_THEME
 		jne .return
@@ -288,37 +347,58 @@ importlib shell32,\
 
 .proc stdcall PortForm.ClearButton_click(.p_form, .p_params, .p_control, .p_eventData)
 	virtObj .form PortForm at pcx from @arg1
-	$call .form.editIn::setText("")
+	$call .form.editOut::setText("")
 	ret
 .endp
 
 .proc stdcall PortForm.OutEdit_drop(.p_form, .p_params, .p_control, .p_eventData) uses pbx psi
 	virtObj .form PortForm at pbx from @arg1
-	virtObj .params params at psi from @arg2
+	virtObj .params Params at psi from @arg2
 
-	.with .string1:String(0), .string2:String(0)
+	.with .fname:String(0), .msg:String(0)
 		.local .p_file:POINTER
-		$call WND|dragFileNameString(&.string1, [.params.wParam], 0)
-		$call .string2::fromChars("Подтвердите отправку файла ", -1)
-		$call .string2::addString(&.string1)::getLpChars()
+		$call WND|dragFileNameString(&.fname, [.params.wParam], 0)
+		$call .msg::fromChars("Подтвердите отправку файла ", -1)
+		$call .msg::addString(&.fname)::getLpChars()
 		$call WND|msgBox(pax, "Подтверждение отправки файла", dwStyle: MB_YESNO)
 		cmp pax, IDYES
 		jne .no_commit
-			$call .string1::getLpChars()
-			$call [fopen](pax, "rb+")
-			mov [.p_file], pax
-			$call .string1::streamRead(pax, 0Ah, NULL, .stream_callback, NULL)
-			$call .string1::getLpChars()
-			$call .form.comIface::write(pax, [.string1.len], &.form.overlapped)
-			$call [WaitForSingleObject]([.form.overlapped.hEvent], 1000)
+			$call .fname::getLpChars()
+			$call [.p_file] = [fopen](pax, "rb+")
+			$call .form::sendFile(pax)
 			$call [fclose]([.p_file])
 		.no_commit:
 	.end_with
 	ret
+.endp
 
-	.proc cdecl .stream_callback(.p_buf, .lParam)
-		$return 0
-	.endp
+.proc stdcall PortForm.FOButton_click(.p_form, .p_params, .p_control, .p_eventData) uses pbx
+	virtObj .form PortForm at pbx from @arg1
+	$call [.form.foDialog]::Show(0)
+
+	test eax, eax
+	js .no_file
+		.local .p_item:P_IShellItem
+		$call [.form.foDialog]::GetResult(&.p_item)
+
+		.local .p_path:POINTER
+		$call [.p_item]::GetDisplayName(SIGDN.DESKTOPABSOLUTEEDITING, &.p_path)::Release()
+		.local .p_file:POINTER
+		$call [.p_file] = [wfopen]([.p_path], L "rb+")
+		$call [CoTaskMemFree]([.p_path])
+		$call .form::sendFile([.p_file])
+		$call [fclose]([.p_file])
+	.no_file:
+	ret
+.endp
+
+.proc stdcall PortForm.listBoxInFormat_selected(.p_form, .p_params, .p_control, .p_eventData)
+	virtObj .form PortForm at pcx from @arg1
+	xor eax, eax
+	cmp [.form.listBoxInFormat.lastSelected], 2
+	sete al
+	$call .form.editIn::setReadOnly(eax)
+	ret
 .endp
 
 .proc strHexToBytes(.p_string) uses psi pdi pbx
@@ -383,44 +463,82 @@ importlib shell32,\
 
 .proc stdcall PortForm.SendButton_click(.p_form, .p_params, .p_control, .p_eventData) uses pbx
 	virtObj .form PortForm at pbx from @arg1
-	$call .form.editOut::getString(&.form.strBuf)
+	$call .form.editIn::getString(&.form.strBuf)
 	cmp [.form.listBoxInFormat.lastSelected], 1
 	jne .no_convert
 		$call c strHexToBytes(&.form.strBuf)
 		cmp eax, 0
 		jne .no_error
-			$call WND|msgBox("Неверный формат ввода!")
+			$call WND|msgBox("Неверный формат ввода!", hwndOwner: [.form.hWnd])
 			ret
 
 		.no_error:
 	.no_convert:
 	$call .form.strBuf::getLpChars()
 	$call .form.comIface::write(pax, [.form.strBuf.len], &.form.overlapped)
-	$call [WaitForSingleObject]([.form.overlapped.hEvent], -1)
-	ret
+	$call [WaitForSingleObject]([.form.overlapped.hEvent], 1000)
+	cmp eax, WAIT_TIMEOUT
+		jne .return
+	$call WND|msgBox("Ошибка при отправке данных!", hwndOwner: [.form.hWnd])
+	
+	.return: ret
 .endp
 
-.proc stdcall PortForm.OutEdit_keyDown(.p_form, .p_params, .p_control, .p_eventData)
-	@sarg @arg1
-	virtObj .params params at pcx from @arg2
+.proc stdcall PortForm.OutEdit_getDlgCode(.p_form, .p_params, .p_control, .p_eventData) uses pbx psi pdi
+	virtObj .form PortForm at pbx from @arg1
+	virtObj .params Params at pdi from @arg2
+	virtObj .msg MSG at psi from [.params.lParam]
+
+	test [.form.isPaused], 1
+		jnz .default
+
+	test psi, psi
+		jz .default
+	
 	cmp [.params.wParam], VK_RETURN
 	@block jne @fb
-		@sarg @arg2, @arg3, @arg4
+		cmp [.msg.message], WM_KEYDOWN
+			jne @fb
+		
+		@sarg @arg3, @arg4
 
 		$call [GetAsyncKeyState](VK_CONTROL)
 		test pax, 0x8000
-			cmovz pcx, [.p_params]
-			jz @fb
+			jz .default
 
-		$call PortForm.SendButton_click([.p_form], [.p_params], [.p_control], [.p_eventData])
+		$call PortForm.SendButton_click(&.form, &.params, [.p_control], [.p_eventData])
 		$return 0
 
 	@endb
-	$call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
-	ret
+
+	cmp [.msg.message], WM_CHAR
+		jne .default
+
+	$call [GetAsyncKeyState](VK_CONTROL)
+	test pax, 0x8000
+		jnz .default
+
+	cmp [.params.wParam], 0
+	@block je @fb
+		cmp [.form.listBoxInFormat.lastSelected], 2
+			jne @fb
+		.local .tst[2]:BYTE
+		mov pax, [.params.wParam]
+		mov word[.tst], ax
+		$call .form.comIface::write(&.tst, 1, &.form.overlapped)
+		$call [WaitForSingleObject]([.form.overlapped.hEvent], 1000)
+		; $call WND|msgBox(&.tst, hwndOwner: [.form.hWnd])
+		; mov [.params.wParam], VK_DELETE
+		; mov [.msg.wParam], VK_DELETE
+		; $return 0
+	@endb
+
+	.default:
+		$call [DefSubclassProc]([.params.hWnd], [.params.uMsg], [.params.wParam], [.params.lParam])
+		ret
 .endp
 
-.proc stdcall PortForm.SetupButton_clicked(.p_form, .p_params, .p_control, .p_eventData) uses pbx psi
+.proc stdcall PortForm.SetupButton_click(.p_form, .p_params, .p_control, .p_eventData) uses pbx psi
 	.baudValues @const dd 75, 110, 134, 150, 300, 600, 1200, \
 			1800, 2400, 4800, 7200, 9600, 14400, 19200, \
 			38400, 57600, 115200, 128000
@@ -477,7 +595,7 @@ importlib shell32,\
 		jmp [.retAddr]
 
 	.error:
-		$call WND|msgBox(pdx)
+		$call WND|msgBox(pdx, hwndOwner: [.form.hWnd])
 		mov [.retAddr], .after_error
 		test [.form.isPaused], 1
 			jz .pause
@@ -547,12 +665,12 @@ importlib shell32,\
 
 .proc stdcall PortForm_COMIn(.p_form, .p_params, .p_eventData) uses pbx psi
 	virtObj .form PortForm at pbx from @arg1
-	virtObj .params params at psi from @arg2
+	virtObj .params Params at psi from @arg2
 	
 	.locals
 		.textLen 	rd 1
 		.startSel 	rd 1
-		.endSel 		rd 1
+		.endSel 	rd 1
 	.endl
 
 	cmp [.params.wParam], NULL
@@ -573,15 +691,15 @@ importlib shell32,\
 		jbe .no_fill
 			mov pcx, [.params.wParam]
 			mov pax, [.params.lParam]
-			$call .form.editIn::setText(addr pcx + 4 + pax - EDIT.LIMIT_TEXT)
-			$call .form.editIn::setSelected(EDIT.LIMIT_TEXT, EDIT.LIMIT_TEXT)
-			$call [SendMessageA]([.form.editIn.hWnd], EM_SCROLLCARET, 0, 0)
+			$call .form.editOut::setText(addr pcx + 4 + pax - EDIT.LIMIT_TEXT)
+			$call .form.editOut::setSelected(EDIT.LIMIT_TEXT, EDIT.LIMIT_TEXT)
+			$call [SendMessageA]([.form.editOut.hWnd], EM_SCROLLCARET, 0, 0)
 			jmp .no_add
 		.no_fill:
 
-		$call .form.editIn::setRedraw(0)
-		$call .form.editIn::getSelected(&.startSel, &.endSel)
-		$call .form.editIn::getTextLen()
+		$call .form.editOut::setRedraw(0)
+		$call .form.editOut::getSelected(&.startSel, &.endSel)
+		$call .form.editOut::getTextLen()
 
 		mov [.textLen], eax
 		add pax, [.params.lParam]
@@ -591,18 +709,18 @@ importlib shell32,\
 			sub [.textLen], eax
 			sub [.startSel], eax
 			sub [.endSel], eax
-			$call .form.editIn::setSelected(0, eax)
-			$call .form.editIn::replaceSelected("")
+			$call .form.editOut::setSelected(0, eax)
+			$call .form.editOut::replaceSelected("")
 		.overflow_limit:
 
-		$call .form.editIn::setSelected([.textLen], [.textLen])
-		$call .form.editIn::setRedraw(1)
+		$call .form.editOut::setSelected([.textLen], [.textLen])
+		$call .form.editOut::setRedraw(1)
 		mov pax, [.params.wParam]
-		$call .form.editIn::replaceSelected(addr pax + 4)
+		$call .form.editOut::replaceSelected(addr pax + 4)
 		
 		cmp [.startSel], 0
 		jl .break_bounds
-			$call .form.editIn::setSelected([.startSel], [.endSel])
+			$call .form.editOut::setSelected([.startSel], [.endSel])
 		.break_bounds:
 	.no_add:
 	$call CNV|free([.params.wParam])
@@ -632,6 +750,9 @@ importlib shell32,\
 
 .proc stdcall PortForm_close(.p_form, .p_params, .p_eventData) uses pbx
 	virtObj .form PortForm at pbx from @arg1
+	cmp [.form.foDialog], NULL
+		je .return
+	
 	$call COMInfo|unregisterNotify([.form.hDeviceNotify])
 	$call .form.strBuf::unmake()
 	test [.form.isPaused], 1
@@ -646,7 +767,8 @@ importlib shell32,\
 	$call [CloseHandle]([.form.threadParams.hPauseEvent])
 	$call [CloseHandle]([.form.threadParams.hPausedEvent])
 	$call .form.comIface::close()
-	ret
+	$call [.form.foDialog]::Release()
+	.return: ret
 .endp
 
 .proc_frame_mode_previous
@@ -654,7 +776,7 @@ importlib shell32,\
 
 ; .proc stdcall PortForm_itemKey uses pbx psi, .p_form, .p_params, .p_eventData
 ; 	@virtObj form PortForm at pbx from @arg1
-; 	@virtObj _params params at pdx from @arg2
+; 	@virtObj _params Params at pdx from @arg2
 ; 	mov pax, [_params.lParam]
 ; 	cmp pax, [form.listBoxOutFormat.hWnd]
 ; 		jne .return
